@@ -1,0 +1,44 @@
+{
+    "name": "ROS 2 Development Container",
+    "privileged": true,
+    "remoteUser": "${localEnv:USER}",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "args": {
+            "USERNAME": "${localEnv:USER}"
+        }
+    },
+    "workspaceFolder": "/arc2026/ws/",
+    "workspaceMount": "source=${localWorkspaceFolder}/src,target=/arc2026/ws/src/your_code,type=bind",
+    "customizations": {
+        "vscode": {
+            "extensions":[
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-themes",
+                "twxs.cmake",
+                "donjayamanne.python-extension-pack",
+                "eamodio.gitlens",
+                "ms-iot.vscode-ros"
+            ]
+        }
+    },
+    "containerEnv": {
+        "DISPLAY": "unix:0",
+        "ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST",
+        "ROS_DOMAIN_ID": "42"
+    },
+    "runArgs": [
+        //"--net=host",         // uncomment for VS Code and connecting with other devices
+        "-e", "DISPLAY=${env:DISPLAY}"
+    ],
+    "mounts": [
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+        "source=/dev/dri,target=/dev/dri,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/.cache/jazzy/build,target=/arc2026/ws/build,type=bind",
+        "source=${localWorkspaceFolder}/.cache/jazzy/install,target=/arc2026/ws/install,type=bind",
+        "source=${localWorkspaceFolder}/.cache/jazzy/log,target=/arc2026/ws/log,type=bind",
+        "source=${localWorkspaceFolder}/maps,target=/arc2026/maps,type=bind",
+        "source=${localWorkspaceFolder}/get_env.sh,target=/usr/bin/get_env,type=bind"
+    ],
+    "postCreateCommand": "rosdep update --rosdistro jazzy && rosdep install --from-paths src/your_code --ignore-src --rosdistro jazzy -y --skip-keys rclrs --skip-keys ament_cargo && sudo chown -R ${localEnv:USER} /arc2026/ws/"
+}
