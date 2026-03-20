@@ -232,7 +232,3 @@ def main(args=None) -> None:
 
 if __name__ == '__main__':
     main()
-
-# ros2 topic pub -r 10 /drive_in ackermann_msgs/msg/AckermannDriveStamped "drive: {speed: 1.0, steering_angle: 0.3}"
-# ros2 run safety_node2 safety_node --ros-args -r drive_out:=drive -r odom:=ego_racecar/odom
-# ros2 service call /reset_safety_node std_srvs/srv/Trigger {}
