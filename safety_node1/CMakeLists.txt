@@ -16,14 +16,14 @@ find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 
 # add executables:
-add_executable(safety_node1 src/safety_node.cpp)
-ament_target_dependencies(safety_node1
-  rclcpp geometry_msgs ackermann_msgs nav_msgs sensor_msgs std_msgs
+add_executable(safety_node src/safety_node.cpp)
+ament_target_dependencies(safety_node
+  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs"
 )
 
 install(TARGETS
-safety_node1
-DESTINATION lib
+safety_node
+DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY
