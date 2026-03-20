@@ -48,7 +48,7 @@ private:
 
 
     double speed = 0.0;
-    float threshold = 1.0;
+    float threshold = 0.001;
     /// TODO: create ROS subscribers and publishers
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -76,6 +76,9 @@ private:
             float x_comp = (-1.0) * std::cos(angle) * ranges[i];
             float projection = std::max(0.0, this->speed * x_comp);
             float TTC = ranges[i] / projection;
+
+            std::cout << "TTC: " << TTC <<std::endl;
+
             if (TTC < threshold) {
                 e_brake = true;
                 break;
