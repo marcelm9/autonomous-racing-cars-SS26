@@ -20,10 +20,10 @@ public:
 
         scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&Safety::scan_callback, this, std::placeholders::_1)); 
 
-        //drive_speed_sub = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>("/drive_in", 10, std::bind(&Safety::speed_callback, this, std::placeholders::_1)); 
+        requested_drive_speed_sub = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>("/drive_in", 10, std::bind(&Safety::requested_drive_speed_callback, this, std::placeholders::_1)); 
             
         // publishers:
-        drive_speed_pub = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+        drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_out", 10);
         
         /*
         You should also subscribe to the /scan topic to get the
@@ -45,25 +45,27 @@ private:
     // declarations:
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
+    rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr requested_drive_speed_sub;
 
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr drive_speed_pub;
+    rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
 
-    double speed = 0.0;
-    float threshold = 10.0;
-    /// TODO: create ROS subscribers and publishers
+    // variables
+    bool e_brake = false;
+    double measured_odometry_speed = 0.0;
+    float threshold = 2.0;
+    float requested_drive_speed = 2.0;
+
+
+    /* ---- CALLBACKS ---- */
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
     {
-        this->speed = msg->twist.twist.linear.x;
+        this->measured_odometry_speed = msg->twist.twist.linear.x;
     }
 
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg) 
     {
-        /// TODO: calculate TTC
-
-        /// TODO: publish drive/brake message
-
         // angle increment:
         float angle_increment = scan_msg->angle_increment;
         float angle_min = scan_msg->angle_min;
@@ -72,42 +74,40 @@ private:
         int num_lasers = ranges.size();
         
         // iterate through all lasers and project
-        bool e_brake = false;
         //std::cout << "new scan" << std::endl;
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
-            float x_comp = (1.0) * std::cos(angle) * ranges[i];
-            float projection = std::max(0.0, this->speed * x_comp);
+            float projection = std::max(0.0, this->measured_odometry_speed * std::cos(angle));
             float TTC = ranges[i] / projection;
-            //std::cout << angle << std::endl;
-            //std::cout << "its not infinite angle:" << angle << " TTC:" << TTC << std::endl;
-            if (!std::isinf(TTC)){
-                if ((angle < 0.1) && (angle > -0.1)) {
-                    //std::cout << "TTC: " << TTC <<std::endl;
-                }
-            }
+
+            //std::cout << angle << " TTC:" << TTC << std::endl;
 
             if (TTC < threshold) {
-                e_brake = true;
+                this->e_brake = true;
                 std::cout << "e-brake engaged" << std::endl;
-                throw std::runtime_error("e brake enganged");
+                //throw std::runtime_error("e brake enganged");
                 break;
             }
         }
 
-        geometry_msgs::msg::Twist msg;
-        if (e_brake) {  // call publisher with ZERO velocity
+        ackermann_msgs::msg::AckermannDriveStamped drive_msg;
+        if (this->e_brake) {  // call publisher with ZERO velocity
 
-            msg.linear.x = 0.0;
-            drive_speed_pub->publish(msg);
+            drive_msg.drive.speed = 0.0;
 
         } else {  // pass on desired velocity to publisher
 
-            //msg.linear.x = this->speed;
+            drive_msg.drive.speed = this->requested_drive_speed;
 
         }
 
-        // drive_speed_pub->publish(msg);
+        drive_speed_pub->publish(drive_msg);
+    }
+
+
+    void requested_drive_speed_callback(const ackermann_msgs::msg::AckermannDriveStamped::ConstSharedPtr msg)
+    {
+        this->requested_drive_speed = msg->drive.speed;
     }
 
 
