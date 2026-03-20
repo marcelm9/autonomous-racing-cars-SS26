@@ -11,6 +11,17 @@ class Safety : public rclcpp::Node {
 public:
     Safety() : Node("safety_node")
     {
+        // subscribers:
+        scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&Safety::scan_callback, this, std::placeholders::_1)); 
+
+        drive_speed_sub = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>("/drive_in", 10, std::bind(&Safety::speed_callback, this, std::placeholders::_1));
+
+        odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&Safety::drive_callback, this, std::placeholders::_1)); 
+        
+        
+        // publishers:
+        drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_in", 10);
+        
         /*
         You should also subscribe to the /scan topic to get the
         sensor_msgs/LaserScan messages and the /ego_racecar/odom topic to get
@@ -27,11 +38,21 @@ public:
     }
 
 private:
+
+    // declarations:
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
+    rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_sub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
+
+    rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
+
     double speed = 0.0;
     /// TODO: create ROS subscribers and publishers
 
     void drive_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
     {
+        std::cout << "IN drive callback: " ;
+        std::cout << msg ;
         /// TODO: update current speed
     }
 
@@ -42,6 +63,10 @@ private:
         /// TODO: publish drive/brake message
     }
 
+    void speed_callback(const ackermann_msgs::msg::AckermannDriveStamped speed_msg)
+    {
+
+    }
 
 
 };

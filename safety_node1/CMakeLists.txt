@@ -9,7 +9,27 @@ endif()
 find_package(ament_cmake REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(ackermann_msgs REQUIRED)
+
+# add executables:
+add_executable(safety_node1 src/safety_node.cpp)
+ament_target_dependencies(safety_node1
+  rclcpp geometry_msgs ackermann_msgs nav_msgs sensor_msgs std_msgs
+)
+
+install(TARGETS
+safety_node1
+DESTINATION lib
+)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
