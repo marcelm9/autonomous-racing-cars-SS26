@@ -50,12 +50,11 @@ class SafetyNode(Node):
             AckermannDriveStamped, '/drive_in', self.drive_callback, 10)
 
         # publishers
-        self.drive_pub = self.create_publisher(
-            AckermannDriveStamped, '/drive_out', 10)
-        self.ttc_pub = self.create_publisher(Float64, '/ttc', 10)
-        self.min_dist_pub = self.create_publisher(Float64, '/min_dist', 10)
-        self.brake_pub = self.create_publisher(Bool, '/brake_engaged', 10)
-        self.marker_pub = self.create_publisher(Marker, '/safety_marker', 10)
+        self.drive_pub = self.create_publisher(AckermannDriveStamped, '/drive_out', 10)
+        self.ttc_pub = self.create_publisher(Float64, '/diagnostics/ttc', 10)
+        self.min_dist_pub = self.create_publisher(Float64, '/diagnostics/min_dist', 10)
+        self.brake_pub = self.create_publisher(Bool, '/diagnostics/brake_engaged', 10)
+        self.marker_pub = self.create_publisher(Marker, '/diagnostics/safety_marker', 10)
 
         # service to reset the safety node
         self.reset_srv = self.create_service(
