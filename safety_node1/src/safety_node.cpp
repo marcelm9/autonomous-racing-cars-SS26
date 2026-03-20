@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <stdexcept>
+#include <iostream>
 #include "rclcpp/rclcpp.hpp"
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -48,7 +50,7 @@ private:
 
 
     double speed = 0.0;
-    float threshold = 0.001;
+    float threshold = 10.0;
     /// TODO: create ROS subscribers and publishers
 
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -71,16 +73,24 @@ private:
         
         // iterate through all lasers and project
         bool e_brake = false;
+        //std::cout << "new scan" << std::endl;
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
-            float x_comp = (-1.0) * std::cos(angle) * ranges[i];
+            float x_comp = (1.0) * std::cos(angle) * ranges[i];
             float projection = std::max(0.0, this->speed * x_comp);
             float TTC = ranges[i] / projection;
-
-            std::cout << "TTC: " << TTC <<std::endl;
+            //std::cout << angle << std::endl;
+            //std::cout << "its not infinite angle:" << angle << " TTC:" << TTC << std::endl;
+            if (!std::isinf(TTC)){
+                if ((angle < 0.1) && (angle > -0.1)) {
+                    //std::cout << "TTC: " << TTC <<std::endl;
+                }
+            }
 
             if (TTC < threshold) {
                 e_brake = true;
+                std::cout << "e-brake engaged" << std::endl;
+                throw std::runtime_error("e brake enganged");
                 break;
             }
         }
@@ -89,14 +99,15 @@ private:
         if (e_brake) {  // call publisher with ZERO velocity
 
             msg.linear.x = 0.0;
+            drive_speed_pub->publish(msg);
 
         } else {  // pass on desired velocity to publisher
 
-            msg.linear.x = this->speed;
+            //msg.linear.x = this->speed;
 
         }
 
-        drive_speed_pub->publish(msg);
+        // drive_speed_pub->publish(msg);
     }
 
 
