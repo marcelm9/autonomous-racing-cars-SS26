@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
+#include <limits>
+
 #include "rclcpp/rclcpp.hpp"
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
@@ -51,10 +53,13 @@ private:
 
 
     // variables
+    float threshold = 0.5;
+
     bool e_brake = false;
     double measured_odometry_speed = 0.0;
-    float threshold = 2.0;
-    float requested_drive_speed = 2.0;
+    float requested_drive_speed = 0.0;
+
+    ackermann_msgs::msg::AckermannDriveStamped drive_msg = ackermann_msgs::msg::AckermannDriveStamped();
 
 
     /* ---- CALLBACKS ---- */
@@ -75,11 +80,18 @@ private:
         
         // iterate through all lasers and project
         //std::cout << "new scan" << std::endl;
+
+        float min_TTC = std::numeric_limits<float>::infinity();
+        float angle_of_min_TTC = 0;
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
             float projection = std::max(0.0, this->measured_odometry_speed * std::cos(angle));
             float TTC = ranges[i] / projection;
-
+            
+            if (TTC < min_TTC) {
+                min_TTC = TTC;
+                angle_of_min_TTC = angle;
+            }
             //std::cout << angle << " TTC:" << TTC << std::endl;
 
             if (TTC < threshold) {
@@ -89,15 +101,17 @@ private:
                 break;
             }
         }
+        std::cout << "Min TTC: " << min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
 
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         if (this->e_brake) {  // call publisher with ZERO velocity
 
             drive_msg.drive.speed = 0.0;
+            drive_msg.drive.steering_angle = 0.0;
 
         } else {  // pass on desired velocity to publisher
 
-            drive_msg.drive.speed = this->requested_drive_speed;
+            drive_msg = this->drive_msg;
 
         }
 
@@ -108,6 +122,7 @@ private:
     void requested_drive_speed_callback(const ackermann_msgs::msg::AckermannDriveStamped::ConstSharedPtr msg)
     {
         this->requested_drive_speed = msg->drive.speed;
+        this->drive_msg = *msg;
     }
 
 
