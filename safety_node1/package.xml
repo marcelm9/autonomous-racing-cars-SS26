@@ -19,7 +19,7 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>nav_msgs</depend>
-  <depend>ackerman_msgs</depend>
+  <depend>ackermann_msgs</depend>
 
 
 </package>
