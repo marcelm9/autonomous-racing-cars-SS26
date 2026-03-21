@@ -8,6 +8,7 @@
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 
 class Safety : public rclcpp::Node {
@@ -16,30 +17,20 @@ class Safety : public rclcpp::Node {
 public:
     Safety() : Node("safety_node")
     {
-        // subscribers:
-
+        /* ---- subscribers ---- */
         odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/ego_racecar/odom", 10, std::bind(&Safety::odom_callback, this, std::placeholders::_1));
 
         scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&Safety::scan_callback, this, std::placeholders::_1)); 
 
         requested_drive_speed_sub = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>("/drive_in", 10, std::bind(&Safety::requested_drive_speed_callback, this, std::placeholders::_1)); 
-            
-        // publishers:
+           
+        
+        /* ---- publishers ---- */
         drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_out", 10);
+           
         
-        /*
-        You should also subscribe to the /scan topic to get the
-        sensor_msgs/LaserScan messages and the /ego_racecar/odom topic to get
-        the nav_msgs/Odometry messages
-
-        The subscribers should use the provided odom_callback and 
-        scan_callback as callback methods
-
-        NOTE that the x component of the linear velocity in odom is the speed
-        */
-
-        /// TODO: create ROS subscribers and publishers
-        
+        /* ---- services ---- */
+        reset_service = this->create_service<std_srvs::srv::Trigger>( "reset_safety", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
     }
 
 private:
@@ -51,10 +42,13 @@ private:
 
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_service;
+
 
     // variables
     float threshold = 0.5;
 
+    float min_TTC = std::numeric_limits<float>::infinity();
     bool e_brake = false;
     double measured_odometry_speed = 0.0;
     float requested_drive_speed = 0.0;
@@ -69,6 +63,7 @@ private:
         this->measured_odometry_speed = msg->twist.twist.linear.x;
     }
 
+
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg) 
     {
         // angle increment:
@@ -76,43 +71,34 @@ private:
         float angle_min = scan_msg->angle_min;
         // ranges:
         std::vector<float> ranges = scan_msg->ranges;
-        int num_lasers = ranges.size();
-        
-        // iterate through all lasers and project
-        //std::cout << "new scan" << std::endl;
 
-        float min_TTC = std::numeric_limits<float>::infinity();
+        // iterate through all lasers and project
+        int num_lasers = ranges.size();
         float angle_of_min_TTC = 0;
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
             float projection = std::max(0.0, this->measured_odometry_speed * std::cos(angle));
             float TTC = ranges[i] / projection;
             
-            if (TTC < min_TTC) {
-                min_TTC = TTC;
+            if (TTC < this->min_TTC) {
+                this->min_TTC = TTC;
                 angle_of_min_TTC = angle;
             }
-            //std::cout << angle << " TTC:" << TTC << std::endl;
 
             if (TTC < threshold) {
                 this->e_brake = true;
                 std::cout << "e-brake engaged" << std::endl;
-                //throw std::runtime_error("e brake enganged");
                 break;
             }
         }
-        std::cout << "Min TTC: " << min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
+        std::cout << "Min TTC: " << this->min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
 
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         if (this->e_brake) {  // call publisher with ZERO velocity
-
             drive_msg.drive.speed = 0.0;
             drive_msg.drive.steering_angle = 0.0;
-
         } else {  // pass on desired velocity to publisher
-
             drive_msg = this->drive_msg;
-
         }
 
         drive_speed_pub->publish(drive_msg);
@@ -123,6 +109,19 @@ private:
     {
         this->requested_drive_speed = msg->drive.speed;
         this->drive_msg = *msg;
+    }
+
+
+    void reset_callback(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+    {
+        if (this->min_TTC < this->threshold) {  // recheck if driving is save now
+            this->e_brake = false;
+            response->success = false;
+            response->message = "E-Brake cannot be disenganged. TTC is still too low!";
+        } else {
+            response->success = true;
+            response->message = "E-Brake has successfully been disengaged";
+        }
     }
 
 

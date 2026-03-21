@@ -14,11 +14,12 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # add executables:
 add_executable(safety_node src/safety_node.cpp)
 ament_target_dependencies(safety_node
-  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs"
+  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs"
 )
 
 install(TARGETS
