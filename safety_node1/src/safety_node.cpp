@@ -9,7 +9,8 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "std_srvs/srv/trigger.hpp"
-
+#include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 class Safety : public rclcpp::Node {
 // The class that handles emergency braking
@@ -27,7 +28,12 @@ public:
         
         /* ---- publishers ---- */
         drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_out", 10);
-           
+        
+        ttc_pub = this->create_publisher<std_msgs::msg::Float64>("/ttc_pub", 10);
+
+        min_dist_obs_pub = this->create_publisher<std_msgs::msg::Float64>("/min_dist_obs_pub", 10);
+
+        ttc_engaged_pub = this->create_publisher<std_msgs::msg::Bool>("/ttc_engaged_pub", 10);
         
         /* ---- services ---- */
         reset_service = this->create_service<std_srvs::srv::Trigger>( "reset_safety", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
@@ -44,6 +50,11 @@ private:
 
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_service;
 
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ttc_pub;
+
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr min_dist_obs_pub;
+
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ttc_engaged_pub;
 
     // variables
     float threshold = 0.5;
@@ -92,6 +103,11 @@ private:
             }
         }
         std::cout << "Min TTC: " << this->min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
+
+        std_msgs::msg::Float64 ttc_msg;
+        ttc_msg.data = this->min_TTC;
+        ttc_pub->publish(ttc_msg);
+
 
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         if (this->e_brake) {  // call publisher with ZERO velocity
