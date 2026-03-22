@@ -38,7 +38,7 @@ class SafetyNode(Node):
         self.brake_engaged: bool = False
         self.current_ttc: float = float('inf')
 
-        self.declare_parameter('ttc_threshold', 0.75)
+        self.declare_parameter('ttc_threshold', 0.7)
         self.add_on_set_parameters_callback(self._on_param_change)
 
         # subscribers
@@ -120,15 +120,25 @@ class SafetyNode(Node):
         angles: npt.NDArray[np.float64],
     ) -> float:
         if len(ranges) == 0:
-            # no beams valid => no collision
             return float('inf')
- 
-        r_dot: npt.NDArray[np.float64] = self.speed * np.cos(angles) # forward facing component of beams ("+x")
- 
-        closing: npt.NDArray[np.bool_] = r_dot > 0.0 # filter out all beams with not-forward-facing components (where "x" is smaller than or equal to 0)
-        if not closing.any():
+
+        if self.speed <= 0.0:
             return float('inf')
- 
+
+        # Nur Frontkegel betrachten
+        front_mask = np.abs(angles) <= np.deg2rad(5)
+        if not np.any(front_mask):
+            return float('inf')
+
+        ranges = ranges[front_mask]
+        angles = angles[front_mask]
+
+        r_dot: npt.NDArray[np.float64] = self.speed * np.cos(angles)
+
+        closing: npt.NDArray[np.bool_] = r_dot > 0.0
+        if not np.any(closing):
+            return float('inf')
+
         ttc_per_beam: npt.NDArray[np.float64] = ranges[closing] / r_dot[closing]
         return float(np.min(ttc_per_beam))
 
