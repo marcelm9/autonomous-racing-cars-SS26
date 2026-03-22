@@ -30,7 +30,7 @@ public:
            
         
         /* ---- services ---- */
-        reset_service = this->create_service<std_srvs::srv::Trigger>( "reset_safety", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
+        reset_service = this->create_service<std_srvs::srv::Trigger>( "/reset_safety_node", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
     }
 
 private:
@@ -48,10 +48,12 @@ private:
     // variables
     float threshold = 0.5;
 
+    sensor_msgs::msg::LaserScan scan_msg;
+
     float min_TTC = std::numeric_limits<float>::infinity();
     bool e_brake = false;
     double measured_odometry_speed = 0.0;
-    float requested_drive_speed = 0.0;
+    double requested_drive_speed = 0.0;
 
     ackermann_msgs::msg::AckermannDriveStamped drive_msg = ackermann_msgs::msg::AckermannDriveStamped();
 
@@ -66,32 +68,16 @@ private:
 
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg) 
     {
-        // angle increment:
-        float angle_increment = scan_msg->angle_increment;
-        float angle_min = scan_msg->angle_min;
-        // ranges:
-        std::vector<float> ranges = scan_msg->ranges;
+        this->scan_msg = *scan_msg;
 
-        // iterate through all lasers and project
-        int num_lasers = ranges.size();
-        float angle_of_min_TTC = 0;
-        for (int i = 0; i < num_lasers; i++)  {
-            float angle = i * angle_increment + angle_min;
-            float projection = std::max(0.0, this->measured_odometry_speed * std::cos(angle));
-            float TTC = ranges[i] / projection;
-            
-            if (TTC < this->min_TTC) {
-                this->min_TTC = TTC;
-                angle_of_min_TTC = angle;
-            }
+        float min_ttc = calc_min_ttc(false); 
 
-            if (TTC < threshold) {
-                this->e_brake = true;
-                std::cout << "e-brake engaged" << std::endl;
-                break;
-            }
+        if (min_ttc < threshold) {
+            this->e_brake = true;
+            std::cout << "e-brake engaged" << std::endl;
         }
-        std::cout << "Min TTC: " << this->min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
+        this->min_TTC = min_ttc;
+        //std::cout << "Min TTC: " << this->min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
 
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         if (this->e_brake) {  // call publisher with ZERO velocity
@@ -114,14 +100,52 @@ private:
 
     void reset_callback(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
-        if (this->min_TTC < this->threshold) {  // recheck if driving is save now
-            this->e_brake = false;
+        // recheck TTC with desired velocity
+        float min_TTC = calc_min_ttc(true);
+
+        if (this->min_TTC < this->threshold) { 
             response->success = false;
             response->message = "E-Brake cannot be disenganged. TTC is still too low!";
         } else {
+            this->e_brake = false;
             response->success = true;
             response->message = "E-Brake has successfully been disengaged";
         }
+    }
+
+
+    /* ---- FUNCTIONS ---- */
+
+    float calc_min_ttc(bool use_desired_speed) {
+
+        float angle_increment = this->scan_msg.angle_increment;
+        float angle_min = this->scan_msg.angle_min;
+        std::vector<float> ranges = this->scan_msg.ranges;
+
+        double speed = 0.0;
+        if (use_desired_speed) {
+            speed = this->requested_drive_speed;
+        } else {
+            speed = this->measured_odometry_speed;
+        }
+
+         // iterate through all lasers and project
+        int num_lasers = ranges.size();
+        float min_TTC = std::numeric_limits<float>::infinity();
+        float angle_of_min_TTC = 0;
+        for (int i = 0; i < num_lasers; i++)  {
+            float angle = i * angle_increment + angle_min;
+
+            float projection = std::max(0.0, speed * std::cos(angle));
+            float ttc = ranges[i] / projection;
+
+            if (ttc < min_TTC) {
+                min_TTC = ttc;
+                angle_of_min_TTC = angle;
+            }
+
+        }
+        return min_TTC;
     }
 
 
