@@ -2,7 +2,7 @@
 import sys
 import threading
 import rclpy
-import select # Added for timeout handling
+import select
 from rclpy.node import Node
 from ackermann_msgs.msg import AckermannDriveStamped
 
@@ -22,11 +22,13 @@ Hold keys to drive:
 
 w/x : Forward / Reverse
 a/d : Steering Left / Right
-s   : Emergency Stop
+s   : Emergency Stop (Sets speed to 0)
 
-Release keys to coast to a stop.
+t   : TOGGLE RC-Style (Current: {mode})
+      - RC-Style: Stops when key is released.
+      - Standard: Maintains speed until changed.
 
-r/v : increase/decrease max speed/steer by 10%
+r/v : increase/decrease max limits by 10%
 CTRL-C to quit
 """
 
@@ -45,18 +47,16 @@ speedBindings = {
 
 def getKey(settings, timeout):
     if sys.platform == 'win32':
-        # Windows doesn't easily support timeout-based keyboard polling in this way
         if msvcrt.kbhit():
             return msvcrt.getwch()
         return None
     
     tty.setraw(sys.stdin.fileno())
-    # Use select to wait for input with a timeout
     rlist, _, _ = select.select([sys.stdin], [], [], timeout)
     if rlist:
         key = sys.stdin.read(1)
     else:
-        key = None # No key pressed during timeout
+        key = None 
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
@@ -75,55 +75,71 @@ def main():
 
     speed_limit = node.declare_parameter('max_speed', 1.5).value
     steer_limit = node.declare_parameter('max_steer', 0.34).value 
+    
+    # NEW: Toggle State
+    rc_style = True 
 
     pub = node.create_publisher(AckermannDriveStamped, 'drive_in', 10)
 
-    # Use a Timer to ensure constant 10Hz publishing for safety_nodes
     current_speed = 0.0
     current_steer = 0.0
 
     def timer_callback():
+        nonlocal current_speed, current_steer
         drive_msg = AckermannDriveStamped()
         drive_msg.header.stamp = node.get_clock().now().to_msg()
         drive_msg.header.frame_id = "base_link"
-        drive_msg.drive.speed = current_speed
-        drive_msg.drive.steering_angle = current_steer
+        drive_msg.drive.speed = float(current_speed)
+        drive_msg.drive.steering_angle = float(current_steer)
         pub.publish(drive_msg)
 
-    # Publish at 10Hz
     timer = node.create_timer(0.1, timer_callback)
 
-    # Spinner in background
     spinner = threading.Thread(target=rclpy.spin, args=(node,))
     spinner.daemon = True
     spinner.start()
 
     try:
-        print(msg)
+        print(msg.format(mode="ON" if rc_style else "OFF"))
         while True:
-            # Check for key every 0.1 seconds
+            # Check for key with a short timeout
             key = getKey(settings, 0.1)
             
             if key in moveBindings:
                 current_speed = moveBindings[key][0] * speed_limit
                 current_steer = moveBindings[key][1] * steer_limit
+            
             elif key in speedBindings:
                 speed_limit *= speedBindings[key][0]
                 steer_limit *= speedBindings[key][1]
                 print(f"Limits: Speed={speed_limit:.2f}, Steer={steer_limit:.2f}")
+            
+            elif key == 't':
+                rc_style = not rc_style
+                print(f"RC-Style Toggled: {'ON' if rc_style else 'OFF'}")
+                if rc_style:
+                    current_speed = 0.0
+                    current_steer = 0.0
+
             elif key == '\x03': # CTRL-C
                 break
+            
             else:
-                # RC-STYLE: No key pressed = Reset to Zero
-                current_speed = 0.0
-                current_steer = 0.0
+                # If no key is pressed and we are in RC-Style, stop the car
+                if key is None and rc_style:
+                    current_speed = 0.0
+                    current_steer = 0.0
 
     except Exception as e:
         print(e)
     finally:
         current_speed = 0.0
         current_steer = 0.0
-        timer_callback() # Final zero publish
+        # Give one last publish to stop the car
+        drive_msg = AckermannDriveStamped()
+        drive_msg.drive.speed = 0.0
+        pub.publish(drive_msg)
+        
         restoreTerminalSettings(settings)
         rclpy.shutdown()
 

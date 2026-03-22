@@ -118,7 +118,7 @@ private:
         // recheck TTC with desired velocity
         float min_TTC = calc_min_ttc(true);
 
-        if (this->min_TTC < this->threshold) { 
+        if (min_TTC < this->threshold) { 
             response->success = false;
             response->message = "E-Brake cannot be disenganged. TTC is still too low!";
         } else {
