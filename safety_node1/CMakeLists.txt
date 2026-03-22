@@ -15,6 +15,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # add executables:
 add_executable(safety_node src/safety_node.cpp)
