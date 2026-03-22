@@ -86,6 +86,7 @@ private:
         // iterate through all lasers and project
         int num_lasers = ranges.size();
         float angle_of_min_TTC = 0;
+        
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
             float projection = std::max(0.0, this->measured_odometry_speed * std::cos(angle));
