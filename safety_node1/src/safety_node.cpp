@@ -81,7 +81,7 @@ private:
     {
         this->scan_msg = *scan_msg;
 
-        float [min_ttc, min_distance] = calc_min_ttc(false); 
+        auto [min_ttc, min_distance] = calc_min_ttc(false); 
 
         if (min_ttc < threshold) {
             this->e_brake = true;
@@ -100,7 +100,7 @@ private:
         min_dist_obs_pub->publish(min_distance_msg);
 
         std_msgs::msg::Bool safety_brake;
-        safety_brake = this->e_brake;
+        safety_brake.data = this->e_brake;
         ebrake_engaged_pub->publish(safety_brake);
         
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
@@ -125,7 +125,7 @@ private:
     void reset_callback(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
         // recheck TTC with desired velocity
-        float min_TTC = calc_min_ttc(true);
+        auto [min_TTC, _] = calc_min_ttc(true);
 
         if (this->min_TTC < this->threshold) { 
             response->success = false;
