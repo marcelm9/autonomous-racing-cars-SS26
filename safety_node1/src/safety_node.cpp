@@ -165,7 +165,10 @@ private:
 
         for (int i = 0; i < num_lasers; i++)  {
             double angle = i * angle_increment + angle_min;
-
+            // Consider only window in front of car
+            if (angle < -1.2 || angle > 1.2) { 
+                continue; 
+            }
             double projection = std::max(0.0, speed * std::cos(angle));
             double ttc;
             if (projection == 0.0) {

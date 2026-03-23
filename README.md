@@ -17,3 +17,5 @@ ros2 launch safety_node1 safety_node1_launch.py
 
 ### reconfigure
 ros2 run rqt_reconfigure rqt_reconfigure
+
+
