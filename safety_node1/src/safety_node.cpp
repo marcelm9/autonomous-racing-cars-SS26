@@ -16,6 +16,7 @@ class Safety : public rclcpp::Node {
 // The class that handles emergency braking
 
 public:
+    // Constructor
     Safety() : Node("safety_node")
     {
         /* ---- subscribers ---- */
@@ -37,6 +38,9 @@ public:
         
         /* ---- services ---- */
         reset_service = this->create_service<std_srvs::srv::Trigger>( "/reset_safety_node", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
+    
+        /* ---- declared parameters ----*/
+        this->declare_parameter<float>("ttc_threshold", 0.75);
     }
 
 private:
@@ -57,7 +61,6 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ebrake_engaged_pub;
 
     // variables
-    float threshold = 0.5;
 
     sensor_msgs::msg::LaserScan scan_msg;
 
@@ -83,7 +86,7 @@ private:
 
         auto [min_ttc, min_distance] = calc_min_ttc(false); 
 
-        if (min_ttc < threshold) {
+        if (min_ttc < this->get_parameter("ttc_threshold").as_double()) {
             this->e_brake = true;
             std::cout << "e-brake engaged" << std::endl;
         }
@@ -127,7 +130,7 @@ private:
         // recheck TTC with desired velocity
         auto [min_TTC, _] = calc_min_ttc(true);
 
-        if (min_TTC < this->threshold) { 
+        if (min_TTC < this->get_parameter("ttc_threshold").as_double()) { 
             response->success = false;
             response->message = "E-Brake cannot be disenganged. TTC is still too low!";
         } else {
