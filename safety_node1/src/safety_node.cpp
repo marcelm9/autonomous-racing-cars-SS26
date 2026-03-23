@@ -145,8 +145,8 @@ private:
 
     std::pair<float, float> calc_min_ttc(bool use_desired_speed) {
 
-        float angle_increment = this->scan_msg.angle_increment;
-        float angle_min = this->scan_msg.angle_min;
+        double angle_increment = this->scan_msg.angle_increment;
+        double angle_min = this->scan_msg.angle_min;
         std::vector<float> ranges = this->scan_msg.ranges;
 
         double speed = 0.0;
@@ -158,16 +158,21 @@ private:
 
          // iterate through all lasers and project
         int num_lasers = ranges.size();
-        float min_TTC = std::numeric_limits<float>::infinity();
-        float angle_of_min_TTC = 0;
-        float min_distance = std::numeric_limits<float>::infinity();
+        double min_TTC = std::numeric_limits<float>::infinity();
+        double angle_of_min_TTC = 0;
+        double min_distance = std::numeric_limits<float>::infinity();
 
 
         for (int i = 0; i < num_lasers; i++)  {
-            float angle = i * angle_increment + angle_min;
+            double angle = i * angle_increment + angle_min;
 
-            float projection = std::max(0.0, speed * std::cos(angle));
-            float ttc = ranges[i] / projection;
+            double projection = std::max(0.0, speed * std::cos(angle));
+            double ttc;
+            if (projection == 0.0) {
+                ttc = std::numeric_limits<float>::infinity();
+            } else {
+                ttc = ranges[i] / projection;
+            }
 
             if (ttc < min_TTC) {
                 min_TTC = ttc;
