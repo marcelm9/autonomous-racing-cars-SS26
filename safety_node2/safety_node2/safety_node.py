@@ -75,6 +75,7 @@ class SafetyNode(Node):
                     return SetParametersResult(
                         successful=False,
                         reason='ttc_threshold must be positive')
+                self.ttc_threshold = p.value
                 self.get_logger().info(
                     f'TTC threshold updated to {p.value:.3f} s')
         return SetParametersResult(successful=True)
@@ -89,9 +90,10 @@ class SafetyNode(Node):
         min_ttc: float = self._compute_min_ttc(ranges, angles)
         self.current_ttc = min_ttc
  
-        if min_ttc < self._ttc_threshold:
+        local_ttc_threshold = self._ttc_threshold
+        if min_ttc < local_ttc_threshold:
             if not self.brake_engaged:
-                self.get_logger().warn(f'AEB engaged (TTC = {min_ttc:.3f} s < threshold {self._ttc_threshold:.3f} s)')
+                self.get_logger().warn(f'AEB engaged (TTC = {min_ttc:.3f} s < threshold {local_ttc_threshold:.3f} s)')
             self.brake_engaged = True
  
         # diagnostics
