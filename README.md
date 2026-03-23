@@ -17,3 +17,6 @@ ros2 launch safety_node1 safety_node1_launch.py
 
 ### reconfigure
 ros2 run rqt_reconfigure rqt_reconfigure
+
+### request ebrake disengagement
+ros2 service call /reset_safety_node std_srvs/srv/Trigger {}
