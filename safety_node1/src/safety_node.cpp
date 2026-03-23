@@ -33,7 +33,7 @@ public:
 
         min_dist_obs_pub = this->create_publisher<std_msgs::msg::Float64>("/min_dist_obs_pub", 10);
 
-        ttc_engaged_pub = this->create_publisher<std_msgs::msg::Bool>("/ttc_engaged_pub", 10);
+        ebrake_engaged_pub = this->create_publisher<std_msgs::msg::Bool>("/ebrake_engaged_pub", 10);
         
         /* ---- services ---- */
         reset_service = this->create_service<std_srvs::srv::Trigger>( "/reset_safety_node", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
@@ -54,7 +54,7 @@ private:
 
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr min_dist_obs_pub;
 
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ttc_engaged_pub;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ebrake_engaged_pub;
 
     // variables
     float threshold = 0.5;
@@ -81,7 +81,7 @@ private:
     {
         this->scan_msg = *scan_msg;
 
-        float min_ttc = calc_min_ttc(false); 
+        auto [min_ttc, min_distance] = calc_min_ttc(false); 
 
         if (min_ttc < threshold) {
             this->e_brake = true;
@@ -90,10 +90,19 @@ private:
         this->min_TTC = min_ttc;
         //std::cout << "Min TTC: " << this->min_TTC << " with ANGLE: " << angle_of_min_TTC << std::endl;
 
+        // Todo put basic info prompts into one topic
         std_msgs::msg::Float64 ttc_msg;
         ttc_msg.data = this->min_TTC;
         ttc_pub->publish(ttc_msg);
 
+        std_msgs::msg::Float64 min_distance_msg;
+        min_distance_msg.data = min_distance;
+        min_dist_obs_pub->publish(min_distance_msg);
+
+        std_msgs::msg::Bool safety_brake;
+        safety_brake.data = this->e_brake;
+        ebrake_engaged_pub->publish(safety_brake);
+        
         ackermann_msgs::msg::AckermannDriveStamped drive_msg;
         if (this->e_brake) {  // call publisher with ZERO velocity
             drive_msg.drive.speed = 0.0;
@@ -116,7 +125,7 @@ private:
     void reset_callback(const std::shared_ptr<std_srvs::srv::Trigger::Request> request, std::shared_ptr<std_srvs::srv::Trigger::Response> response)
     {
         // recheck TTC with desired velocity
-        float min_TTC = calc_min_ttc(true);
+        auto [min_TTC, _] = calc_min_ttc(true);
 
         if (min_TTC < this->threshold) { 
             response->success = false;
@@ -131,7 +140,7 @@ private:
 
     /* ---- FUNCTIONS ---- */
 
-    float calc_min_ttc(bool use_desired_speed) {
+    std::pair<float, float> calc_min_ttc(bool use_desired_speed) {
 
         float angle_increment = this->scan_msg.angle_increment;
         float angle_min = this->scan_msg.angle_min;
@@ -148,6 +157,9 @@ private:
         int num_lasers = ranges.size();
         float min_TTC = std::numeric_limits<float>::infinity();
         float angle_of_min_TTC = 0;
+        float min_distance = std::numeric_limits<float>::infinity();
+
+
         for (int i = 0; i < num_lasers; i++)  {
             float angle = i * angle_increment + angle_min;
 
@@ -159,8 +171,12 @@ private:
                 angle_of_min_TTC = angle;
             }
 
+            if (ranges[i] < min_distance) {
+                min_distance = ranges[i];
+            }
+
         }
-        return min_TTC;
+        return {min_TTC, min_distance};
     }
 
 
