@@ -43,7 +43,7 @@ public:
         reset_service = this->create_service<std_srvs::srv::Trigger>( "/reset_safety_node", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
     
         /* ---- declared parameters ----*/
-        this->declare_parameter<float>("ttc_threshold", 0.75);
+        this->declare_parameter<float>("ttc_threshold", 0.7);
 
         // publish green marker once
         publish_ebrake_marker();
@@ -175,7 +175,7 @@ private:
         for (int i = 0; i < num_lasers; i++)  {
             double angle = i * angle_increment + angle_min;
             // Consider only window in front of car
-            if (angle < -1.2 || angle > 1.2) { 
+            if (angle < -0.087 || angle > 0.087) { 
                 continue; 
             }
             double projection = std::max(0.0, speed * std::cos(angle));
