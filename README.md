@@ -1,5 +1,7 @@
 # STARTUP
-
+ 
+## Build only one package
+colcon build --packages-select reactive
 ## Source Files
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
@@ -20,3 +22,7 @@ ros2 run rqt_reconfigure rqt_reconfigure
 
 ### request ebrake disengagement
 ros2 service call /reset_safety_node std_srvs/srv/Trigger {}
+
+
+### Launch reactive node
+ros2 launch reactive reactive_node_launch.py
