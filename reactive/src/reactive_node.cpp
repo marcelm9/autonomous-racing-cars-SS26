@@ -86,7 +86,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     int ray_idx = static_cast<int>((gap_angles[i] - angle_min) / angle_increment);
     if (ray_idx < ranges.size())
     {
-      gap_lengths[i] = ranges[ray_idx];
+      gap_lengths.push_back(ranges[ray_idx]);
     }
   }
 
@@ -103,13 +103,14 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
   this->goal_angle = gap_angles[gap_idx];
 
-  // Simple implementation, take mid of gap
+  // Simple implementation, take mid of  
+  /*
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
       this->goal_angle = 0.0; // Default to straight if no gap found
   }
-  
+  */
   //std::cout << "Goal angle" << goal_angle<< std::endl;
 
   
@@ -137,15 +138,30 @@ void FollowGap::visualize_lidar_ranges()
       visualization_msgs::msg::MarkerArray marker_array;
       for (int i = 0; i < num_lasers; i++) {
 
-        double angle = i * angle_increment + angle_min;
+      double r = 1.0;
+      double g = 0.0;
+      double b = 0.0;
+      std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
+      int counter = 0;
+      for (int i = 0; i < this->all_gaps.size(); i++) {
+        for (int j = 0; j < this->all_gaps[i].size(); j++) {
+          counter +=1;
+          //calc ranges index
+          double angle = this->all_gaps[i][j];
+          int index = static_cast<int>( (angle - angle_min) / angle_increment );
+          float range = ranges[index];
 
-        // project marker position
-        double x = std::cos(angle) * ranges[i];
-        double y = std::sin(angle) * ranges[i];
+          double x = std::cos(angle) * range;
+          double y = std::sin(angle) * range;
 
-        visualization_msgs::msg::Marker marker = this->create_marker(x, y, 0.0, 1.0, 0.0, i);
+          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 2.0, counter);
 
-        marker_array.markers.push_back(marker);
+          marker_array.markers.push_back(marker);
+
+        }
+        double temp = r;
+        r = b;
+        b = temp;
       }
 
       // project goal angle
