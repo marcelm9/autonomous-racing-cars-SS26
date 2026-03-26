@@ -79,14 +79,14 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // Simple implementation, take mid of gap
-  double goal_angle = gap_angles[gap_angles.size()/2];
+  this->goal_angle = gap_angles[gap_angles.size()/2];
   
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
   drive_msg.drive.speed = this->NORMALDRIVESPEED;
-  drive_msg.drive.steering_angle = goal_angle;
-  //drive_speed_pub->publish(drive_msg);
+  drive_msg.drive.steering_angle = this->goal_angle;
+  drive_speed_pub->publish(drive_msg);
 
 
   this->visualize_lidar_ranges();
@@ -104,7 +104,33 @@ void FollowGap::visualize_lidar_ranges()
 
       visualization_msgs::msg::MarkerArray marker_array;
       for (int i = 0; i < num_lasers; i++) {
+
         double angle = i * angle_increment + angle_min;
+
+        // project marker position
+        double x = std::cos(angle) * ranges[i];
+        double y = std::sin(angle) * ranges[i];
+
+        visualization_msgs::msg::Marker marker = this->create_marker(x, y, 0.0, 1.0, 0.0, i);
+
+        marker_array.markers.push_back(marker);
+      }
+
+      // project goal angle
+      double x = std::cos(this->goal_angle) * 1;
+      double y = std::sin(this->goal_angle) * 1;
+
+      visualization_msgs::msg::Marker marker = this->create_marker(x, y, 1.0, 0.0, 0.0, num_lasers);
+      marker_array.markers.push_back(marker);
+
+      // publish array
+      gap_publisher->publish(marker_array);
+    }
+
+
+
+  visualization_msgs::msg::Marker FollowGap::create_marker(double x, double y, double r, double g, double b, int id)
+  {
         // create message
         visualization_msgs::msg::Marker marker;
 
@@ -112,16 +138,11 @@ void FollowGap::visualize_lidar_ranges()
         marker.header.stamp = rclcpp::Clock().now();
 
         marker.ns = "basic_shapes";
-        marker.id = i;
+        marker.id = id;
 
         marker.type = visualization_msgs::msg::Marker::SPHERE;
 
         marker.action = visualization_msgs::msg::Marker::ADD;
-
-
-        // project marker position
-        double x = std::cos(angle) * ranges[i];
-        double y = std::sin(angle) * ranges[i];
 
         marker.pose.position.x = x;
         marker.pose.position.y = y;
@@ -135,17 +156,15 @@ void FollowGap::visualize_lidar_ranges()
         marker.scale.y = 0.03;
         marker.scale.z = 0.03;
 
-        marker.color.r = 0.0f;
-        marker.color.g = 1.0f;
-        marker.color.b = 0.0f;
+        marker.color.r = r;
+        marker.color.g = g;
+        marker.color.b = b;
         marker.color.a = 1.0;
 
-        marker_array.markers.push_back(marker);
-      }
+        return marker;
+  }
+    
 
-      std::cout << "in publish marker array" << std::endl;
-      gap_publisher->publish(marker_array);
-    }
 
 int main(int argc, char ** argv) {
     rclcpp::init(argc, argv);

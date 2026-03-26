@@ -35,6 +35,8 @@ class FollowGap : public rclcpp::Node
         double THRESHOLD = 1.1; // min distance to be considered gap
         int n_gabhits = 10; // Need at least 
 
+        double goal_angle = 0;
+
         sensor_msgs::msg::LaserScan scan_msg;
         
         // subscribers
@@ -53,6 +55,9 @@ class FollowGap : public rclcpp::Node
         //int main(int argc, char ** argv);
 
         void visualize_lidar_ranges();
+
+        visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, int id);
+
 
 };
 
