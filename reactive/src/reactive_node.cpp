@@ -119,19 +119,21 @@ void FollowGap::visualize_lidar_ranges()
 
       double r = 1.0;
       double g = 0.0;
-      double b = 1.0;
-
+      double b = 0.0;
+      std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
+      int counter = 0;
       for (int i = 0; i < this->all_gaps.size(); i++) {
         for (int j = 0; j < this->all_gaps[i].size(); j++) {
+          counter +=1;
           //calc ranges index
           double angle = this->all_gaps[i][j];
-          int index = (angle - angle_min) / angle;
+          int index = static_cast<int>( (angle - angle_min) / angle_increment );
           float range = ranges[index];
 
-          double x = std::cos(angle) * ranges[i];
-          double y = std::sin(angle) * ranges[i];
+          double x = std::cos(angle) * range;
+          double y = std::sin(angle) * range;
 
-          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 1.0, i);
+          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 2.0, counter);
 
           marker_array.markers.push_back(marker);
 
