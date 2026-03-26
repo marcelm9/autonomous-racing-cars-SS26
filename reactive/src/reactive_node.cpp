@@ -31,6 +31,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   int idx_smallest;
 
+  
   for (int i = 0; i < num_lasers; i++)  
   {
     double angle = i * angle_increment + angle_min;
@@ -45,24 +46,36 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // Set safety bubble around smallest distance = 0
   for (int j = idx_smallest - this->SAFETYBUBBLE/2;
     j < idx_smallest + this->SAFETYBUBBLE/2;
-    j ++)
+    j ++) {ranges[j] = 0;}
+
+  // Find possible gaps
+  std::vector<double> gap_angles;
+  std::vector<double> temp_angles; 
+  int min_count = 0;
+  for (int k = 0; k < num_lasers; k++)
   {
-    ranges[j] = 0;
+    double angle = k * angle_increment + angle_min;
+    if (ranges[k] > this->THRESHOLD)
+    {
+      // possible gap
+      temp_angles.push_back(angle);
+      min_count++;
+      
+    } else 
+    {
+      // end of Gap
+      if (min_count > this-> n_gabhits && temp_angles.size() > gap_angles.size()){
+        // new best gap
+        gap_angles = temp_angles;
+      }
+      min_count = 0;
+      temp_angles.clear();
+    }
   }
 
-  double gap_left = std::abs(angle_max - (current_angle + this->SAFETYBUBBLE/2 * angle_increment));
-
-  double gap_right = std::abs(angle_min - (current_angle - this->SAFETYBUBBLE/2 * angle_increment));
-
-  double goal_angle;
+  // Simple implementation, take mid of gap
+  double goal_angle = gap_angles[gap_angles.size()/2];
   
-  if (gap_left < gap_right)
-  {
-    goal_angle = angle_min + gap_right/2;
-  } else
-  {
-    goal_angle = angle_min + gap_right/2;
-  }
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
