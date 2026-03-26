@@ -152,13 +152,13 @@ void FollowGap::visualize_lidar_ranges()
       double angle_max = this->scan_msg.angle_max;
 
       visualization_msgs::msg::MarkerArray marker_array;
-
+      /*
       double r = 1.0;
       double g = 0.0;
       double b = 0.0;
       //std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
       int counter = 0;
-      /*
+      
 
       for (int i = 0; i < this->all_gaps.size(); i++) {
         for (int j = 0; j < this->all_gaps[i].size(); j++) {
