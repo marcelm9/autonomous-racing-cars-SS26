@@ -55,9 +55,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   std::vector<double> gap_angles;
   std::vector<std::vector<double>> all_gaps;
   std::vector<double> temp_angles; 
-  int min_count = 0;
+  size_t min_count = 0;
 
-  for (int k = static_cast<int>(num_lasers * 0.25); k < num_lasers * 0.75; k++)
+  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
   {
     double angle = k * angle_increment + angle_min;
     if (ranges[k] > this->THRESHOLD)
@@ -68,32 +68,68 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       
     } else {
       // end of Gap
-      if (min_count > this-> n_gabhits && temp_angles.size() > gap_angles.size()) {
+      if (min_count > this-> n_gaphits && temp_angles.size() > gap_angles.size()) {
         // new best gap
         gap_angles = temp_angles;
       }
 
       min_count = 0;
-      all_gaps.push_back(temp_angles);
+      if (!temp_angles.empty()) all_gaps.push_back(temp_angles);
       temp_angles.clear();
     }
+  }
+  if (temp_angles.size() > gap_angles.size() && temp_angles.size() > this->n_gaphits) {
+      gap_angles = temp_angles;
   }
 
   this->all_gaps = all_gaps;
   this->gap_angles = gap_angles;
 
-  if (temp_angles.size() > gap_angles.size() && temp_angles.size() > this->n_gabhits) {
-    gap_angles = temp_angles;
-  }
-
+ 
+  /*
   // Simple implementation, take mid of gap
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
       this->goal_angle = 0.0; // Default to straight if no gap found
-  }
+  } */
   
   //std::cout << "Goal angle" << goal_angle<< std::endl;
+
+
+  // Take mean ray as goal
+  if (!gap_angles.empty()){
+    std::vector<double> gap_lengths;
+    for (double angle : gap_angles)
+    {
+      int ray_idx = static_cast<int>((angle - angle_min) / angle_increment);
+      if (ray_idx>= 0 && ray_idx < static_cast<int>(ranges.size())) {
+        gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
+      }
+    }
+
+    if (!gap_lengths.empty()) {
+      double sum = std::accumulate(gap_lengths.begin(), gap_lengths.end(), 0.0);
+      double mean = sum / static_cast<double>(gap_lengths.size());
+      double min_distance_mean = std::numeric_limits<double>::infinity();
+      int best_gap_idx = 0;
+      for (size_t i = 0; i < gap_lengths.size(); i++)
+      {
+        double distance = std::abs(gap_lengths[i] - mean);
+        if (distance < min_distance_mean)
+        {
+          min_distance_mean = distance;
+          best_gap_idx = static_cast<int>(i);
+        }
+      }
+      this->goal_angle = gap_angles[best_gap_idx];
+    } else {
+      this->goal_angle = 0.0;
+    }
+  } else {
+    this->goal_angle = 0.0;
+  }
+  
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
