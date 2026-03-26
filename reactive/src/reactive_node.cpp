@@ -18,27 +18,23 @@ FollowGap::FollowGap() : Node("reactive_node")
 
 void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg) 
 {
+  
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
-  double angle_max = scan_msg->angle_max;
 
   std::vector<float> ranges = scan_msg->ranges;
 
   // iterate through all lasers and project
   int num_lasers = ranges.size();
   double min_distance = std::numeric_limits<float>::infinity();
-  double current_angle;
 
   int idx_smallest;
 
   
   for (int i = 0; i < num_lasers; i++)  
   {
-    double angle = i * angle_increment + angle_min;
-
     if (ranges[i] < min_distance) {
         min_distance = ranges[i];
-        current_angle = angle;
         idx_smallest = i;
     }
   }
@@ -76,6 +72,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // Simple implementation, take mid of gap
   double goal_angle = gap_angles[gap_angles.size()/2];
   
+  std::cout << "Goal angle" << goal_angle<< std::endl;
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
