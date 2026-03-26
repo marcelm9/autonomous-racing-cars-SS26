@@ -28,13 +28,15 @@ class FollowGap : public rclcpp::Node
         FollowGap();
 
     private:
-        // PARAMETERS
-        int SAFETYBUBBLE = 50; 
-        double NORMALDRIVESPEED = 0.1;
-
         // variables
-        sensor_msgs::msg::LaserScan scan_msg;
+        int SAFETYBUBBLE = 50; // 
+        double NORMALDRIVESPEED = 2;
 
+        double THRESHOLD = 1.1; // min distance to be considered gap
+        int n_gabhits = 10; // Need at least 
+
+        sensor_msgs::msg::LaserScan scan_msg;
+        
         // subscribers
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
         
@@ -42,10 +44,15 @@ class FollowGap : public rclcpp::Node
         // publishers
         rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
+        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
+
         
 
         // methods
         void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
         //int main(int argc, char ** argv);
+
+        void visualize_lidar_ranges();
+
 };
 

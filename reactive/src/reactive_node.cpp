@@ -9,6 +9,9 @@ FollowGap::FollowGap() : Node("reactive_node")
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_out", 10);
 
+  gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 10);
+
+
   // variables
 
 
@@ -33,6 +36,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   int idx_smallest;
 
+  
   for (int i = 0; i < num_lasers; i++)  
   {
     double angle = i * angle_increment + angle_min;
@@ -47,36 +51,51 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // Set safety bubble around smallest distance = 0
   for (int j = idx_smallest - this->SAFETYBUBBLE/2;
     j < idx_smallest + this->SAFETYBUBBLE/2;
-    j ++)
+    j ++) {ranges[j] = 0;}
+
+  // Find possible gaps
+  std::vector<double> gap_angles;
+  std::vector<double> temp_angles; 
+  int min_count = 0;
+  for (int k = 0; k < num_lasers; k++)
   {
-    ranges[j] = 0;
+    double angle = k * angle_increment + angle_min;
+    if (ranges[k] > this->THRESHOLD)
+    {
+      // possible gap
+      temp_angles.push_back(angle);
+      min_count++;
+      
+    } else 
+    {
+      // end of Gap
+      if (min_count > this-> n_gabhits && temp_angles.size() > gap_angles.size()){
+        // new best gap
+        gap_angles = temp_angles;
+      }
+      min_count = 0;
+      temp_angles.clear();
+    }
   }
 
-  double gap_left = std::abs(angle_max - (current_angle + this->SAFETYBUBBLE/2 * angle_increment));
-
-  double gap_right = std::abs(angle_min - (current_angle - this->SAFETYBUBBLE/2 * angle_increment));
-
-  double goal_angle;
+  // Simple implementation, take mid of gap
+  double goal_angle = gap_angles[gap_angles.size()/2];
   
-  if (gap_left < gap_right)
-  {
-    goal_angle = angle_min + gap_right/2;
-  } else
-  {
-    goal_angle = angle_min + gap_right/2;
-  }
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
   drive_msg.drive.speed = this->NORMALDRIVESPEED;
   drive_msg.drive.steering_angle = goal_angle;
-  drive_speed_pub->publish(drive_msg);  
+  //drive_speed_pub->publish(drive_msg);
+
+
+  this->visualize_lidar_ranges();
 }
 
 
-void visualize_lidar_ranges()
+void FollowGap::visualize_lidar_ranges()
     {
-      std::vector<float> ranges = this->scan_msg.ranges();
+      std::vector<float> ranges = this->scan_msg.ranges;
       int num_lasers = ranges.size();
       
       double angle_increment = this->scan_msg.angle_increment;
@@ -84,7 +103,7 @@ void visualize_lidar_ranges()
       double angle_max = this->scan_msg.angle_max;
 
       visualization_msgs::msg::MarkerArray marker_array;
-      for (i = 0; i < num_lasers; i++) {
+      for (int i = 0; i < num_lasers; i++) {
         double angle = i * angle_increment + angle_min;
         // create message
         visualization_msgs::msg::Marker marker;
@@ -93,7 +112,7 @@ void visualize_lidar_ranges()
         marker.header.stamp = rclcpp::Clock().now();
 
         marker.ns = "basic_shapes";
-        marker.id = 0;
+        marker.id = i;
 
         marker.type = visualization_msgs::msg::Marker::SPHERE;
 
@@ -121,10 +140,11 @@ void visualize_lidar_ranges()
         marker.color.b = 0.0f;
         marker.color.a = 1.0;
 
-        marker_arra.push_back(marker);
+        marker_array.markers.push_back(marker);
       }
 
-        ebrake_vis_pub->publish(marker);
+      std::cout << "in publish marker array" << std::endl;
+      gap_publisher->publish(marker_array);
     }
 
 int main(int argc, char ** argv) {
