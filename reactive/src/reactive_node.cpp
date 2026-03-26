@@ -102,7 +102,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   drive_speed_pub->publish(drive_msg);
 
 
-  //this->visualize_lidar_ranges();
+  this->visualize_lidar_ranges();
 }
 
 
@@ -145,8 +145,12 @@ void FollowGap::visualize_lidar_ranges()
       }
       */
 
+      if (this->gap_angles.empty()) {
+        std::cout << "No best gap at time" << rclcpp::Clock().now().seconds() << std::endl;
+        return;
+      }
+
       // handle best gap
-      
       double angle_left = this->gap_angles[0];
       double angle_right = this->gap_angles[this->gap_angles.size()-1];
 
@@ -156,7 +160,10 @@ void FollowGap::visualize_lidar_ranges()
       double x2 = std::cos(angle_right) * 1;
       double y2 = std::sin(angle_right) * 1;
 
-      //svisualization_msgs::msg::Marker marker = this->create_line_marker(x1, y2)
+      visualization_msgs::msg::Marker line_left_marker = this->create_line_marker(0, 0, x1, y1, 0.0, 1.0, 0.0, 0.01, 0);
+      marker_array.markers.push_back(line_left_marker);
+      visualization_msgs::msg::Marker line_right_marker = this->create_line_marker(0, 0, x2, y2, 0.0, 1.0, 0.0, 0.01, 1);
+      marker_array.markers.push_back(line_right_marker);
 
       // project goal angle
       double x = std::cos(this->goal_angle) * 1;
