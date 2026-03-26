@@ -102,7 +102,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   drive_speed_pub->publish(drive_msg);
 
 
-  this->visualize_lidar_ranges();
+  //this->visualize_lidar_ranges();
 }
 
 
@@ -123,18 +123,18 @@ void FollowGap::visualize_lidar_ranges()
       //std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
       int counter = 0;
       /*
+
       for (int i = 0; i < this->all_gaps.size(); i++) {
         for (int j = 0; j < this->all_gaps[i].size(); j++) {
-          counter +=1;
           //calc ranges index
           double angle = this->all_gaps[i][j];
-          int index = static_cast<int>( (angle - angle_min) / angle_increment );
+          int index = (angle - angle_min) / angle;
           float range = ranges[index];
 
-          double x = std::cos(angle) * range;
-          double y = std::sin(angle) * range;
+          double x = std::cos(angle) * ranges[i];
+          double y = std::sin(angle) * ranges[i];
 
-          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 2.0, counter);
+          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 1.0, i);
 
           marker_array.markers.push_back(marker);
 
