@@ -53,8 +53,10 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   // Find possible gaps
   std::vector<double> gap_angles;
+  std::vector<std::vector<double>> all_gaps;
   std::vector<double> temp_angles; 
   int min_count = 0;
+
   for (int k = static_cast<int>(num_lasers * 0.25); k < num_lasers * 0.75; k++)
   {
     double angle = k * angle_increment + angle_min;
@@ -64,17 +66,22 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       temp_angles.push_back(angle);
       min_count++;
       
-    } else 
-    {
+    } else {
       // end of Gap
-      if (min_count > this-> n_gabhits && temp_angles.size() > gap_angles.size()){
+      if (min_count > this-> n_gabhits && temp_angles.size() > gap_angles.size()) {
         // new best gap
         gap_angles = temp_angles;
       }
+
       min_count = 0;
+      all_gaps.push_back(temp_angles);
       temp_angles.clear();
     }
   }
+
+  this->all_gaps = all_gaps;
+  this->gap_angles = gap_angles;
+
   if (temp_angles.size() > gap_angles.size() && temp_angles.size() > this->n_gabhits) {
     gap_angles = temp_angles;
   }
@@ -109,24 +116,36 @@ void FollowGap::visualize_lidar_ranges()
       double angle_max = this->scan_msg.angle_max;
 
       visualization_msgs::msg::MarkerArray marker_array;
-      for (int i = 0; i < num_lasers; i++) {
 
-        double angle = i * angle_increment + angle_min;
+      double r = 1.0;
+      double g = 0.0;
+      double b = 1.0;
 
-        // project marker position
-        double x = std::cos(angle) * ranges[i];
-        double y = std::sin(angle) * ranges[i];
+      for (int i = 0; i < this->all_gaps.size(); i++) {
+        for (int j = 0; j < this->all_gaps[i].size(); j++) {
+          //calc ranges index
+          double angle = this->all_gaps[i][j];
+          int index = (angle - angle_min) / angle;
+          float range = ranges[index];
 
-        visualization_msgs::msg::Marker marker = this->create_marker(x, y, 0.0, 1.0, 0.0, i);
+          double x = std::cos(angle) * ranges[i];
+          double y = std::sin(angle) * ranges[i];
 
-        marker_array.markers.push_back(marker);
+          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 1.0, i);
+
+          marker_array.markers.push_back(marker);
+
+        }
+        double temp = r;
+        r = b;
+        b = temp;
       }
 
       // project goal angle
       double x = std::cos(this->goal_angle) * 1;
       double y = std::sin(this->goal_angle) * 1;
 
-      visualization_msgs::msg::Marker marker = this->create_marker(x, y, 1.0, 0.0, 0.0, num_lasers);
+      visualization_msgs::msg::Marker marker = this->create_marker(x, y, 1.0, 0.0, 0.0, 3.0, num_lasers);
       marker_array.markers.push_back(marker);
 
       // publish array
@@ -135,7 +154,7 @@ void FollowGap::visualize_lidar_ranges()
 
 
 
-  visualization_msgs::msg::Marker FollowGap::create_marker(double x, double y, double r, double g, double b, int id)
+  visualization_msgs::msg::Marker FollowGap::create_marker(double x, double y, double r, double g, double b, double size_factor, int id)
   {
         // create message
         visualization_msgs::msg::Marker marker;
@@ -158,9 +177,9 @@ void FollowGap::visualize_lidar_ranges()
         marker.pose.orientation.z = 0.0;
         marker.pose.orientation.w = 1.0;
 
-        marker.scale.x = 0.03;
-        marker.scale.y = 0.03;
-        marker.scale.z = 0.03;
+        marker.scale.x = 0.03 * size_factor;
+        marker.scale.y = 0.03 * size_factor;
+        marker.scale.z = 0.03 * size_factor;
 
         marker.color.r = r;
         marker.color.g = g;

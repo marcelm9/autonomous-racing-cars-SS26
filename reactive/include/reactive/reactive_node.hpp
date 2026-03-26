@@ -28,14 +28,17 @@ class FollowGap : public rclcpp::Node
         FollowGap();
 
     private:
-        // variables
+        // PARAMETERS
         int SAFETYBUBBLE = 50; // 
         double NORMALDRIVESPEED = 1.0;
 
         double THRESHOLD = 1.2; // min distance to be considered gap
         int n_gabhits = 20; // Need at least 
 
+        // variables
         double goal_angle = 0;
+        std::vector<double> gap_angles;
+        std::vector<std::vector<double>> all_gaps;
 
         sensor_msgs::msg::LaserScan scan_msg;
         
@@ -56,7 +59,7 @@ class FollowGap : public rclcpp::Node
 
         void visualize_lidar_ranges();
 
-        visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, int id);
+        visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
 
 
 };
