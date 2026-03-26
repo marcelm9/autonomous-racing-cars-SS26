@@ -96,7 +96,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   
   //std::cout << "Goal angle" << goal_angle<< std::endl;
 
-
+  /*
   // Take mean ray as goal
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
@@ -107,7 +107,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
         gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
       }
     }
-
     if (!gap_lengths.empty()) {
       double sum = std::accumulate(gap_lengths.begin(), gap_lengths.end(), 0.0);
       double mean = sum / static_cast<double>(gap_lengths.size());
@@ -124,12 +123,36 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       }
       this->goal_angle = gap_angles[best_gap_idx];
     } else {
+      // std::cout << "Gap_angles" << gap_angles << std::endl;
       this->goal_angle = 0.0;
     }
   } else {
     this->goal_angle = 0.0;
   }
-  
+  */
+
+  // May ray as gives direction
+
+  if (!gap_angles.empty()){
+    std::vector<double> gap_lengths;
+    for (double angle : gap_angles) {
+      int ray_idx = static_cast<int>((angle - angle_min) / angle_increment);
+      if (ray_idx>= 0 && ray_idx < static_cast<int>(ranges.size())) {
+        gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
+      }
+    }
+    if (!gap_lengths.empty()) {
+      // find largest distance
+      auto it = std::max_element(gap_lengths.begin(), gap_lengths.end());
+      int max_idx = std::distance(gap_lengths.begin(), it);
+      this->goal_angle = gap_angles[max_idx];      
+    } else {
+      // std::cout << "Gap_angles" << gap_angles << std::endl;
+      this->goal_angle = 0.0;
+    }
+  } else {
+    this->goal_angle = 0.0;
+  }
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 

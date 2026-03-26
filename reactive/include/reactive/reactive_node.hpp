@@ -33,7 +33,7 @@ class FollowGap : public rclcpp::Node
         double NORMALDRIVESPEED = 2;
 
 
-        float THRESHOLD = 1.2; // min distance to be considered gap
+        float THRESHOLD = 2.2; // min distance to be considered gap
         size_t n_gaphits = 20; // Need at least 
 
         // variables
