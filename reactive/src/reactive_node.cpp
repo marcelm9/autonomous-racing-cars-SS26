@@ -93,7 +93,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       this->goal_angle = 0.0; // Default to straight if no gap found
   }
   
-  std::cout << "Goal angle" << goal_angle<< std::endl;
+  //std::cout << "Goal angle" << goal_angle<< std::endl;
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
