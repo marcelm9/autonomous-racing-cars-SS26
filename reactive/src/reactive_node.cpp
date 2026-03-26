@@ -9,7 +9,7 @@ FollowGap::FollowGap() : Node("reactive_node")
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive_out", 10);
 
-  gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 10);
+  gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 1);
 
 
   // variables
@@ -120,8 +120,9 @@ void FollowGap::visualize_lidar_ranges()
       double r = 1.0;
       double g = 0.0;
       double b = 0.0;
-      std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
+      //std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
       int counter = 0;
+      /*
       for (int i = 0; i < this->all_gaps.size(); i++) {
         for (int j = 0; j < this->all_gaps[i].size(); j++) {
           counter +=1;
@@ -142,6 +143,20 @@ void FollowGap::visualize_lidar_ranges()
         r = b;
         b = temp;
       }
+      */
+
+      // handle best gap
+      
+      double angle_left = this->gap_angles[0];
+      double angle_right = this->gap_angles[this->gap_angles.size()-1];
+
+      double x1 = std::cos(angle_left) * 1;
+      double y1 = std::sin(angle_left) * 1;
+
+      double x2 = std::cos(angle_right) * 1;
+      double y2 = std::sin(angle_right) * 1;
+
+      //svisualization_msgs::msg::Marker marker = this->create_line_marker(x1, y2)
 
       // project goal angle
       double x = std::cos(this->goal_angle) * 1;
@@ -190,6 +205,44 @@ void FollowGap::visualize_lidar_ranges()
 
         return marker;
   }
+
+  visualization_msgs::msg::Marker FollowGap::create_line_marker(double x1, double y1, double x2, double y2, double r, double g, double b, double width, int id)
+{
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = "ego_racecar/laser";
+    marker.header.stamp = this->get_clock()->now();
+
+    marker.ns = "lines";
+    marker.id = id;
+
+    marker.type = visualization_msgs::msg::Marker::LINE_LIST;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose.orientation.w = 1.0;
+
+    marker.scale.x = width;   // line width
+
+    marker.color.r = r;
+    marker.color.g = g;
+    marker.color.b = b;
+    marker.color.a = 1.0;
+
+    geometry_msgs::msg::Point p1;
+    p1.x = x1;
+    p1.y = y1;
+    p1.z = 0.0;
+
+    geometry_msgs::msg::Point p2;
+    p2.x = x2;
+    p2.y = y2;
+    p2.z = 0.0;
+
+    marker.points.push_back(p1);
+    marker.points.push_back(p2);
+
+    return marker;
+}
     
 
 

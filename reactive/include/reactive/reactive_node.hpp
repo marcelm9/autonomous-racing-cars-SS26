@@ -62,6 +62,10 @@ class FollowGap : public rclcpp::Node
 
         visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
 
+        visualization_msgs::msg::Marker create_line_marker(double x1, double y1, double x2, double y2, double r, double g, double b, double width, int id);
+
+
+
 
 };
 
