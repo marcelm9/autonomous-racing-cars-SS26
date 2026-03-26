@@ -31,14 +31,16 @@ class FollowGap : public rclcpp::Node
 
         // subscribers
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
+        rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
 
         // publishers
+        rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
         
 
         // methods
         void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
-
+        void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
         //int main(int argc, char ** argv);
 };
 
