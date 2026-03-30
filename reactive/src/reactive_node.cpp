@@ -131,7 +131,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
   */
 
-  // May ray as gives direction
+  // Max Ray as gives direction
 
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
