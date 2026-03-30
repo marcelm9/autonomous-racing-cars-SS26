@@ -75,7 +75,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       mean_distance = sum_distance / valid_count;
   }
   //std::cout << mean_distance << std::endl;
-  this->THRESHOLD = mean_distance;
+  //this->THRESHOLD = mean_distance;
 
   for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
   {
