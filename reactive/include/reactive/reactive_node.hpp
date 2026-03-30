@@ -30,7 +30,7 @@ class FollowGap : public rclcpp::Node
     private:
         // PARAMETERS
         int SAFETYBUBBLE = 50; // 
-        double NORMALDRIVESPEED = 2;
+        double NORMALDRIVESPEED = 1;
 
 
         float THRESHOLD = 2.2; // min distance to be considered gap
