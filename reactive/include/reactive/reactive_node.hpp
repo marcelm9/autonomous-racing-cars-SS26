@@ -29,11 +29,11 @@ class FollowGap : public rclcpp::Node
 
     private:
         // PARAMETERS
-        int SAFETYBUBBLE = 50; // 
-        double NORMALDRIVESPEED = 1;
+        int SAFETYBUBBLE = 300; // 
+        double NORMALDRIVESPEED = 0.3;
 
 
-        float THRESHOLD = 0.0; // min distance to be considered gap
+        float THRESHOLD = 1.2; // min distance to be considered gap
         size_t n_gaphits = 160; // Need at least 
 
 
@@ -41,6 +41,9 @@ class FollowGap : public rclcpp::Node
         double goal_angle = 0;
         std::vector<double> gap_angles;
         std::vector<std::vector<double>> all_gaps;
+
+        int bubble_index_start = 0;
+        int bubble_index_end = 0;
 
         sensor_msgs::msg::LaserScan scan_msg;
         

@@ -47,6 +47,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   int start = std::max(0, idx_smallest - static_cast<int>(this->SAFETYBUBBLE / 2));
   int end = std::min(num_lasers - 1, idx_smallest + static_cast<int>(this->SAFETYBUBBLE / 2));
 
+  this->bubble_index_start = start;
+  this->bubble_index_end = end;
+
   for (int j = start; j <= end; j++) {
       ranges[j] = 0.0;
   }
@@ -56,6 +59,23 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   std::vector<std::vector<double>> all_gaps;
   std::vector<double> temp_angles; 
   size_t min_count = 0;
+
+  double sum_distance = 0.0;
+  int valid_count = 0;
+
+  for (int i = 0; i < num_lasers; i++) {
+      if (std::isfinite(ranges[i])) {
+          sum_distance += ranges[i];
+          valid_count++;
+      }
+  }
+
+  double mean_distance = 0.0;
+  if (valid_count > 0) {
+      mean_distance = sum_distance / valid_count;
+  }
+  //std::cout << mean_distance << std::endl;
+  this->THRESHOLD = mean_distance;
 
   for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
   {
@@ -68,15 +88,18 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       
     } else {
       // end of Gap
-      if (min_count > this-> n_gaphits && temp_angles.size() > gap_angles.size()) {
+      if (min_count > this->n_gaphits && temp_angles.size() > gap_angles.size()) {
         // new best gap
         gap_angles = temp_angles;
       }
 
-      min_count = 0;
-      if (!temp_angles.empty()) all_gaps.push_back(temp_angles);
+      if (!temp_angles.empty() && min_count > this->n_gaphits) all_gaps.push_back(temp_angles);
       temp_angles.clear();
+      min_count = 0;
     }
+  }
+  if (!temp_angles.empty() && min_count > this->n_gaphits) {
+    all_gaps.push_back(temp_angles);
   }
   if (temp_angles.size() > gap_angles.size() && temp_angles.size() > this->n_gaphits) {
       gap_angles = temp_angles;
@@ -86,14 +109,14 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->gap_angles = gap_angles;
 
  
-  
+  /*
   // Simple implementation, take mid of gap
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
       this->goal_angle = 0.0; // Default to straight if no gap found
   } 
-  
+  */
   //std::cout << "Goal angle" << goal_angle<< std::endl;
 /*
   
@@ -132,7 +155,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   */
 
   // May ray as gives direction
-  /*
+  
 
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
@@ -154,7 +177,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   } else {
     this->goal_angle = 0.0;
   }
-  */
+  
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
@@ -177,54 +200,61 @@ void FollowGap::visualize_lidar_ranges()
       double angle_max = this->scan_msg.angle_max;
 
       visualization_msgs::msg::MarkerArray marker_array;
-      /*
-      double r = 1.0;
-      double g = 0.0;
+
+      // add clear marker
+      visualization_msgs::msg::Marker clear_marker;
+      clear_marker.action = visualization_msgs::msg::Marker::DELETEALL;
+      marker_array.markers.push_back(clear_marker);
+
+
+      // visualize saftey bubble
+      double bouble_angel_start = angle_min + this->bubble_index_start * angle_increment;
+      double bouble_angel_end = angle_min + this->bubble_index_end * angle_increment;
+
+      double bouble_x1 = std::cos(bouble_angel_start) * ranges[this->bubble_index_start];
+      double bouble_y1 = std::sin(bouble_angel_start) * ranges[this->bubble_index_start];
+      double bouble_x2 = std::cos(bouble_angel_end) * ranges[this->bubble_index_end];
+      double bouble_y2 = std::sin(bouble_angel_end) * ranges[this->bubble_index_end];
+
+      visualization_msgs::msg::Marker bubble_marker = this->create_line_marker(bouble_x1, bouble_y1, bouble_x2, bouble_y2, 1.0, 0.0, 0.0, 0.01, 0);
+      marker_array.markers.push_back(bubble_marker);
+
+      // viz gaps
+      int num_gaps = this->all_gaps.size();
+      std::cout << num_gaps << std::endl;
+      double g = 1.0;
       double b = 0.0;
-      //std::cout << "number of gaps: " << this->all_gaps.size() << std::endl;
-      int counter = 0;
-      
+      for (int i = 0; i < num_gaps; i++) {
+        std::vector<double> current_gap = this->all_gaps[i];
 
-      for (int i = 0; i < this->all_gaps.size(); i++) {
-        for (int j = 0; j < this->all_gaps[i].size(); j++) {
-          //calc ranges index
-          double angle = this->all_gaps[i][j];
-          int index = (angle - angle_min) / angle;
-          float range = ranges[index];
-
-          double x = std::cos(angle) * ranges[i];
-          double y = std::sin(angle) * ranges[i];
-
-          visualization_msgs::msg::Marker marker = this->create_marker(x, y, r, g, b, 1.0, i);
-
-          marker_array.markers.push_back(marker);
-
-        }
-        double temp = r;
-        r = b;
-        b = temp;
-      }
-      */
-
-      if (this->gap_angles.empty()) {
-        std::cout << "No best gap at time" << rclcpp::Clock().now().seconds() << std::endl;
+        if (current_gap.empty()) {
+          std::cout << "No best gap at time" << rclcpp::Clock().now().seconds() << std::endl;
         return;
       }
 
-      // handle best gap
-      double angle_left = this->gap_angles[0];
-      double angle_right = this->gap_angles[this->gap_angles.size()-1];
+        // handle current gap
+        double angle_left = current_gap[0];
+        double angle_right = current_gap[current_gap.size()-1];
 
-      double x1 = std::cos(angle_left) * 3;
-      double y1 = std::sin(angle_left) * 3;
+        int index1 = static_cast<int>((angle_left - angle_min) / angle_increment);
+        int index2 = static_cast<int>((angle_right - angle_min) / angle_increment);
 
-      double x2 = std::cos(angle_right) * 3;
-      double y2 = std::sin(angle_right) * 3;
+        double x1 = std::cos(angle_left) * ranges[index1];
+        double y1 = std::sin(angle_left) * ranges[index1];
 
-      visualization_msgs::msg::Marker line_left_marker = this->create_line_marker(0, 0, x1, y1, 0.0, 1.0, 0.0, 0.01, 0);
-      marker_array.markers.push_back(line_left_marker);
-      visualization_msgs::msg::Marker line_right_marker = this->create_line_marker(0, 0, x2, y2, 0.0, 1.0, 0.0, 0.01, 1);
-      marker_array.markers.push_back(line_right_marker);
+        double x2 = std::cos(angle_right) * ranges[index2];
+        double y2 = std::sin(angle_right) * ranges[index2];
+
+        double temp = g;;
+        g = b;
+        b = temp;
+        visualization_msgs::msg::Marker line_left_marker = this->create_line_marker(0, 0, x1, y1, 0.0, g, b, 0.01, 2*i+1);
+        marker_array.markers.push_back(line_left_marker);
+        visualization_msgs::msg::Marker line_right_marker = this->create_line_marker(0, 0, x2, y2, 0.0, g, b, 0.01, 2*i+2);
+        marker_array.markers.push_back(line_right_marker);
+
+
+      }
 
       // project goal angle
       double x = std::cos(this->goal_angle) * 1;
