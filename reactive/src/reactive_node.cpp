@@ -57,7 +57,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   std::vector<double> temp_angles; 
   size_t min_count = 0;
 
-  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
+  for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
   {
     double angle = k * angle_increment + angle_min;
     if (ranges[k] > this->THRESHOLD)
@@ -86,17 +86,17 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->gap_angles = gap_angles;
 
  
-  /*
+  
   // Simple implementation, take mid of gap
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
       this->goal_angle = 0.0; // Default to straight if no gap found
-  } */
+  } 
   
   //std::cout << "Goal angle" << goal_angle<< std::endl;
-
-
+/*
+  
   // Take mean ray as goal
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
@@ -107,7 +107,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
         gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
       }
     }
-
     if (!gap_lengths.empty()) {
       double sum = std::accumulate(gap_lengths.begin(), gap_lengths.end(), 0.0);
       double mean = sum / static_cast<double>(gap_lengths.size());
@@ -124,12 +123,37 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       }
       this->goal_angle = gap_angles[best_gap_idx];
     } else {
+      // std::cout << "Gap_angles" << gap_angles << std::endl;
       this->goal_angle = 0.0;
     }
   } else {
     this->goal_angle = 0.0;
   }
-  
+  */
+
+  // May ray as gives direction
+  /*
+  if (!gap_angles.empty()){
+    std::vector<double> gap_lengths;
+    for (double angle : gap_angles) {
+      int ray_idx = static_cast<int>((angle - angle_min) / angle_increment);
+      if (ray_idx>= 0 && ray_idx < static_cast<int>(ranges.size())) {
+        gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
+      }
+    }
+    if (!gap_lengths.empty()) {
+      // find largest distance
+      auto it = std::max_element(gap_lengths.begin(), gap_lengths.end());
+      int max_idx = std::distance(gap_lengths.begin(), it);
+      this->goal_angle = gap_angles[max_idx];      
+    } else {
+      // std::cout << "Gap_angles" << gap_angles << std::endl;
+      this->goal_angle = 0.0;
+    }
+  } else {
+    this->goal_angle = 0.0;
+  }
+  */
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
@@ -190,11 +214,11 @@ void FollowGap::visualize_lidar_ranges()
       double angle_left = this->gap_angles[0];
       double angle_right = this->gap_angles[this->gap_angles.size()-1];
 
-      double x1 = std::cos(angle_left) * 1;
-      double y1 = std::sin(angle_left) * 1;
+      double x1 = std::cos(angle_left) * 3;
+      double y1 = std::sin(angle_left) * 3;
 
-      double x2 = std::cos(angle_right) * 1;
-      double y2 = std::sin(angle_right) * 1;
+      double x2 = std::cos(angle_right) * 3;
+      double y2 = std::sin(angle_right) * 3;
 
       visualization_msgs::msg::Marker line_left_marker = this->create_line_marker(0, 0, x1, y1, 0.0, 1.0, 0.0, 0.01, 0);
       marker_array.markers.push_back(line_left_marker);
