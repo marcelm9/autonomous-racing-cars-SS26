@@ -28,12 +28,44 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   std::vector<float> ranges = scan_msg->ranges;
 
+  //// WALL AVOIDANCE ////
+  // find closest distance to car on both sides so later the steering can be adjusted
+
+  int num_lasers = ranges.size();
+  double min_distance = std::numeric_limits<float>::infinity();
+  int idx_closest_right;
+  int idx_closest_left;
+
+
+  // right side
+  for (int i = 0; i < num_lasers/2; i++)  
+  {
+    if (ranges[i] < min_distance) {
+      // find smallest range  
+      min_distance = ranges[i];
+      idx_closest_right = i;
+    }
+  }
+
+  min_distance = std::numeric_limits<float>::infinity();
   
+  // left side
+  for (int i = num_lasers/2; i < num_lasers; i++)  
+  {
+    if (ranges[i] < min_distance) {
+      // find smallest range  
+      min_distance = ranges[i];
+      idx_closest_left = i;
+    }
+  }
+
+  double dist_closest_right = ranges[idx_closest_right];
+  double dist_closest_left = ranges[idx_closest_left];
+
   //// SAFETY BUBBLE GENERATION ////
   // look for the closest point and set a safety bubble around it
   
-  int num_lasers = ranges.size();
-  double min_distance = std::numeric_limits<float>::infinity();
+  min_distance = std::numeric_limits<float>::infinity();
   int idx_smallest;
 
   for (int i = 0; i < num_lasers; i++)  
@@ -51,11 +83,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->bubble_index_start = start;
   this->bubble_index_end = end;
 
-  // set distance for points in bubble to 0 exept for the center of the bubble
+  // set distance for points in bubble to 0
   for (int j = start; j <= end; j++) {
-    if (j == idx_smallest) {
-      continue;
-    }
     ranges[j] = 0.0;
   }
 
@@ -63,8 +92,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance untill a gap is found
 
-  for (int i = 0; i < 6; i++) {
-    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD)*i/6;
+  for (int i = 0; i < 10; i++) {
+    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD)*i/10;
     this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty()) {
       // gap found at current threshold
@@ -76,8 +105,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->gap_angles = gap_angles;
 
  
-  
-  // Simple implementation, take mid of gap
+  //// STEERING ////
+
+  // Steer to middle of gap
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
@@ -85,15 +115,14 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   } 
 
   // Modify steering angle if close to wall
-  double angle_of_closest = idx_smallest * angle_increment + angle_min;
-  double correction = (angle_of_closest/1.5 - 1)*0.43;
-  if (ranges[idx_smallest] < this->SAFETY_DIST_WALL) {
-    std::cout << "angle of closest   "  << goal_angle<< std::endl;
-    goal_angle = goal_angle - 0.2 * static_cast<int>((angle_of_closest/std::abs(angle_of_closest)));
-  }
+  double angle_closest_right = idx_closest_right * angle_increment + angle_min;
+  double correction_right = 1/std::pow(dist_closest_right,2) * (1.2/ std::clamp(angle_closest_right, -1.2 , 0.01));
   
-  //std::cout << "angle of closest   "  << goal_angle<< std::endl;
-  //std::cout << "correction  " << correction<< std::endl;
+  double angle_closest_left = idx_closest_left * angle_increment + angle_min;
+  double correction_left = 1/std::pow(dist_closest_left,2) * (1.2/ std::clamp(angle_closest_left, 0.01 , 1.2));
+
+  goal_angle = goal_angle - std::clamp((correction_left+correction_right)/30, -0.4,0.4);
+
 
   /*
   // Take mean ray as goal
@@ -218,7 +247,7 @@ void FollowGap::find_gaps_by_threshold(
   double temp_dist_sum = 0; 
   double best_dist_sum = 0;
 
-  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
+  for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
   {
     double angle = k * angle_increment + angle_min;
     

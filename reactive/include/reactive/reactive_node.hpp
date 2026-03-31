@@ -29,16 +29,16 @@ class FollowGap : public rclcpp::Node
 
     private:
         // PARAMETERS
-        int SAFETYBUBBLE = 150; // 
-        double NORMALDRIVESPEED = 0.5;
+        int SAFETYBUBBLE = 2; // 
+        double NORMALDRIVESPEED = 1.5;
 
 
         float MAX_THRESHOLD = 8; // Distance for the first gap search
-        float MIN_THRESHOLD = 1;
+        float MIN_THRESHOLD = 0.5;
         size_t n_gaphits = 60; // Need at least 
         float SAFETY_DIST_WALL = 1;
 
-        int TO_BUBBLE_MARGIN = 100; // minimum ray index count margin of the steering to the safety bubble
+        int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
 
         // variables
         double goal_angle = 0;
