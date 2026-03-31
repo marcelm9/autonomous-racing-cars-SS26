@@ -43,6 +43,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     }
   }
 
+   //std::cout << "distance to smallest" << ranges[idx_smallest] << std::endl;
   // Set safety bubble around smallest distance = 0
   int start = std::max(0, idx_smallest - static_cast<int>(this->SAFETYBUBBLE / 2));
   int end = std::min(num_lasers - 1, idx_smallest + static_cast<int>(this->SAFETYBUBBLE / 2));
@@ -53,6 +54,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (int j = start; j <= end; j++) {
       ranges[j] = 0.0;
   }
+
+  //std::cout << "Bubble start and end index" << start << "   |   "<< end << "    smallest index   " << idx_smallest<< std::endl;
+ 
 
   // Find possible gaps
   std::vector<double> gap_angles;
@@ -77,7 +81,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   //std::cout << mean_distance << std::endl;
   //this->THRESHOLD = mean_distance;
 
-  for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
+  double temp_dist_sum = 0; 
+  double best_dist_sum = 0; 
+  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
   {
     double angle = k * angle_increment + angle_min;
     if (ranges[k] > this->THRESHOLD)
@@ -85,23 +91,28 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       // possible gap
       temp_angles.push_back(angle);
       min_count++;
+      temp_dist_sum += ranges[k];
       
     } else {
       // end of Gap
-      if (min_count > this->n_gaphits && temp_angles.size() > gap_angles.size()) {
+      if (min_count > this->n_gaphits && temp_dist_sum > best_dist_sum) {
         // new best gap
+        //std::cout << "Goal angle" << temp_dist_sum<< std::endl;
+        //std::cout << "Goal angle" << temp_dist_sum<< std::endl;
         gap_angles = temp_angles;
+        best_dist_sum = temp_dist_sum;
       }
 
       if (!temp_angles.empty() && min_count > this->n_gaphits) all_gaps.push_back(temp_angles);
       temp_angles.clear();
       min_count = 0;
+      temp_dist_sum = 0.0;
     }
   }
   if (!temp_angles.empty() && min_count > this->n_gaphits) {
     all_gaps.push_back(temp_angles);
   }
-  if (temp_angles.size() > gap_angles.size() && temp_angles.size() > this->n_gaphits) {
+  if (temp_dist_sum > best_dist_sum && min_count > this->n_gaphits) {
       gap_angles = temp_angles;
   }
 
@@ -118,7 +129,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   } 
   */
   //std::cout << "Goal angle" << goal_angle<< std::endl;
-/*
+
   
   // Take mean ray as goal
   if (!gap_angles.empty()){
@@ -152,10 +163,10 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   } else {
     this->goal_angle = 0.0;
   }
-  */
+  
 
   // May ray as gives direction
-  
+  /*
 
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
@@ -169,19 +180,49 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       // find largest distance
       auto it = std::max_element(gap_lengths.begin(), gap_lengths.end());
       int max_idx = std::distance(gap_lengths.begin(), it);
-      this->goal_angle = gap_angles[max_idx];      
+
+      // Convert local gap index to global laser scan index
+      int global_max_idx = static_cast<int>((gap_angles[max_idx] - angle_min) / angle_increment);
+
+      // Now compare global indices safely
+      int diff_to_start = std::abs(start - global_max_idx);
+      int diff_to_end = std::abs(end - global_max_idx);
+      int diff_to_bubble = std::min(diff_to_end, diff_to_start);
+      double direction_indicator;
+      
+      
+      //std::cout << "diff to bubbke" << diff_to_bubble << std::endl;
+      //std::cout << "diff to bubble" << diff_to_bubble << std::endl;
+ 
+
+      if (diff_to_bubble > this->TO_BUBBLE_MARGIN) {
+        this->goal_angle = gap_angles[max_idx];
+        //std::cout << "   ALARM     " << idx_smallest<< std::endl;
+      } else {
+        if (diff_to_start > diff_to_end) {
+          direction_indicator = 1 *( this->TO_BUBBLE_MARGIN - diff_to_end);
+          
+        } else {
+          direction_indicator = -1 * (this->TO_BUBBLE_MARGIN - diff_to_start);
+        }
+        std::cout << "   goalangle old     " << max_idx << std::endl;
+        this->goal_angle = gap_angles[max_idx + direction_indicator];
+        std::cout << "   goalangle new     " << max_idx + direction_indicator << std::endl;
+      }
+      
+            
     } else {
-      // std::cout << "Gap_angles" << gap_angles << std::endl;
+      //std::cout << "Gap_angles" << gap_angles << std::endl;
       this->goal_angle = 0.0;
     }
   } else {
     this->goal_angle = 0.0;
   }
-  
+  */
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.4189f, 0.4189f);
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.42f, 0.42f); // should be 0.34
   drive_msg.drive.speed = this->NORMALDRIVESPEED;
   drive_speed_pub->publish(drive_msg);
 
