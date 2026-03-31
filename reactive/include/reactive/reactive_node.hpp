@@ -33,8 +33,10 @@ class FollowGap : public rclcpp::Node
         double NORMALDRIVESPEED = 0.5;
 
 
-        float THRESHOLD = 2; // min distance to be considered gap
+        float MAX_THRESHOLD = 8; // Distance for the first gap search
+        float MIN_THRESHOLD = 1;
         size_t n_gaphits = 60; // Need at least 
+        float SAFETY_DIST_WALL = 1;
 
         int TO_BUBBLE_MARGIN = 100; // minimum ray index count margin of the steering to the safety bubble
 
@@ -64,6 +66,15 @@ class FollowGap : public rclcpp::Node
         //int main(int argc, char ** argv);
 
         void visualize_lidar_ranges();
+
+        void find_gaps_by_threshold(
+            const std::vector<float>& ranges, 
+            double threshold, 
+            double angle_min, 
+            double angle_increment, 
+            std::vector<std::vector<double>>& out_all_gaps, 
+            std::vector<double>& out_best_gap
+        );
 
         visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
 

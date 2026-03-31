@@ -28,109 +28,74 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   std::vector<float> ranges = scan_msg->ranges;
 
-  // iterate through all lasers and project
+  
+  //// SAFETY BUBBLE GENERATION ////
+  // look for the closest point and set a safety bubble around it
+  
   int num_lasers = ranges.size();
   double min_distance = std::numeric_limits<float>::infinity();
-
   int idx_smallest;
 
-  
   for (int i = 0; i < num_lasers; i++)  
   {
     if (ranges[i] < min_distance) {
-        min_distance = ranges[i];
-        idx_smallest = i;
+      // find smallest range  
+      min_distance = ranges[i];
+      idx_smallest = i;
     }
   }
 
-   //std::cout << "distance to smallest" << ranges[idx_smallest] << std::endl;
   // Set safety bubble around smallest distance = 0
   int start = std::max(0, idx_smallest - static_cast<int>(this->SAFETYBUBBLE / 2));
   int end = std::min(num_lasers - 1, idx_smallest + static_cast<int>(this->SAFETYBUBBLE / 2));
-
   this->bubble_index_start = start;
   this->bubble_index_end = end;
 
+  // set distance for points in bubble to 0 exept for the center of the bubble
   for (int j = start; j <= end; j++) {
-      ranges[j] = 0.0;
+    if (j == idx_smallest) {
+      continue;
+    }
+    ranges[j] = 0.0;
   }
 
-  //std::cout << "Bubble start and end index" << start << "   |   "<< end << "    smallest index   " << idx_smallest<< std::endl;
- 
 
-  // Find possible gaps
-  std::vector<double> gap_angles;
-  std::vector<std::vector<double>> all_gaps;
-  std::vector<double> temp_angles; 
-  size_t min_count = 0;
+  //// DYNAMIC GAP SEARCH ////
+  // look for a gap far away and if none is found reduce the distance untill a gap is found
 
-  double sum_distance = 0.0;
-  int valid_count = 0;
-
-  for (int i = 0; i < num_lasers; i++) {
-      if (std::isfinite(ranges[i])) {
-          sum_distance += ranges[i];
-          valid_count++;
-      }
-  }
-
-  double mean_distance = 0.0;
-  if (valid_count > 0) {
-      mean_distance = sum_distance / valid_count;
-  }
-  //std::cout << mean_distance << std::endl;
-  //this->THRESHOLD = mean_distance;
-
-  double temp_dist_sum = 0; 
-  double best_dist_sum = 0; 
-  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
-  {
-    double angle = k * angle_increment + angle_min;
-    if (ranges[k] > this->THRESHOLD)
-    {
-      // possible gap
-      temp_angles.push_back(angle);
-      min_count++;
-      temp_dist_sum += ranges[k];
-      
-    } else {
-      // end of Gap
-      if (min_count > this->n_gaphits && temp_dist_sum > best_dist_sum) {
-        // new best gap
-        //std::cout << "Goal angle" << temp_dist_sum<< std::endl;
-        //std::cout << "Goal angle" << temp_dist_sum<< std::endl;
-        gap_angles = temp_angles;
-        best_dist_sum = temp_dist_sum;
-      }
-
-      if (!temp_angles.empty() && min_count > this->n_gaphits) all_gaps.push_back(temp_angles);
-      temp_angles.clear();
-      min_count = 0;
-      temp_dist_sum = 0.0;
+  for (int i = 0; i < 6; i++) {
+    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD)*i/6;
+    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
+    if (!gap_angles.empty()) {
+      // gap found at current threshold
+      break;
     }
   }
-  if (!temp_angles.empty() && min_count > this->n_gaphits) {
-    all_gaps.push_back(temp_angles);
-  }
-  if (temp_dist_sum > best_dist_sum && min_count > this->n_gaphits) {
-      gap_angles = temp_angles;
-  }
-
+  
   this->all_gaps = all_gaps;
   this->gap_angles = gap_angles;
 
  
-  /*
+  
   // Simple implementation, take mid of gap
   if (!gap_angles.empty()) {
       this->goal_angle = gap_angles[gap_angles.size() / 2];
   } else {
       this->goal_angle = 0.0; // Default to straight if no gap found
   } 
-  */
-  //std::cout << "Goal angle" << goal_angle<< std::endl;
 
+  // Modify steering angle if close to wall
+  double angle_of_closest = idx_smallest * angle_increment + angle_min;
+  double correction = (angle_of_closest/1.5 - 1)*0.43;
+  if (ranges[idx_smallest] < this->SAFETY_DIST_WALL) {
+    std::cout << "angle of closest   "  << goal_angle<< std::endl;
+    goal_angle = goal_angle - 0.2 * static_cast<int>((angle_of_closest/std::abs(angle_of_closest)));
+  }
   
+  //std::cout << "angle of closest   "  << goal_angle<< std::endl;
+  //std::cout << "correction  " << correction<< std::endl;
+
+  /*
   // Take mean ray as goal
   if (!gap_angles.empty()){
     std::vector<double> gap_lengths;
@@ -163,7 +128,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   } else {
     this->goal_angle = 0.0;
   }
-  
+  */
 
   // May ray as gives direction
   /*
@@ -228,6 +193,67 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
 
   this->visualize_lidar_ranges();
+}
+
+
+void FollowGap::find_gaps_by_threshold(
+    const std::vector<float>& ranges, 
+    double threshold, 
+    double angle_min, 
+    double angle_increment, 
+    std::vector<std::vector<double>>& out_all_gaps, 
+    std::vector<double>& out_best_gap)
+{
+
+  out_all_gaps.clear();
+  out_best_gap.clear();
+
+    // Find possible gaps
+  std::vector<double> gap_angles;
+  std::vector<std::vector<double>> all_gaps;
+  std::vector<double> temp_angles; 
+  size_t min_count = 0;
+
+  int num_lasers = ranges.size();
+  double temp_dist_sum = 0; 
+  double best_dist_sum = 0;
+
+  for (int k = static_cast<int>(num_lasers * 0.25); k < static_cast<int>(num_lasers * 0.75); k++)
+  {
+    double angle = k * angle_increment + angle_min;
+    
+    if (ranges[k] > threshold) {
+      // inside a possible gap
+      temp_angles.push_back(angle);
+      min_count++;
+      temp_dist_sum += ranges[k];
+      
+    } else {
+      // end of Gap
+      
+      if (min_count > this->n_gaphits && temp_dist_sum > best_dist_sum) {
+        // new best gap
+        out_best_gap = temp_angles;
+        best_dist_sum = temp_dist_sum;
+      }
+
+      // safe as a found gap
+      if (!temp_angles.empty() && min_count > this->n_gaphits) out_all_gaps.push_back(temp_angles);
+      
+      // reset temporary values for next gap
+      temp_angles.clear();
+      min_count = 0;
+      temp_dist_sum = 0.0;
+    }
+  }
+
+  // edge case: scan ends with a gap still "open"
+  if (!temp_angles.empty() && min_count > this->n_gaphits) {
+      out_all_gaps.push_back(temp_angles);
+      if (temp_dist_sum > best_dist_sum) {
+          out_best_gap = temp_angles;
+      }
+  }
 }
 
 
