@@ -19,69 +19,59 @@
 
 // declarations:
 
-class FollowGap : public rclcpp::Node 
+class FollowGap : public rclcpp::Node
 {
-    public:
-        // variables
+public:
+    // variables
 
-        // constructor
-        FollowGap();
+    // constructor
+    FollowGap();
 
-    private:
-        // PARAMETERS
-        int SAFETYBUBBLE = 2; // 
-        double NORMALDRIVESPEED = 1.5;
+private:
+    // PARAMETERS
+    int SAFETYBUBBLE = 2; //
+    double NORMALDRIVESPEED = 1.5;
 
+    float MAX_THRESHOLD = 8; // Distance for the first gap search
+    float MIN_THRESHOLD = 0.5;
+    size_t n_gaphits = 60; // Need at least
+    float SAFETY_DIST_WALL = 1;
 
-        float MAX_THRESHOLD = 8; // Distance for the first gap search
-        float MIN_THRESHOLD = 0.5;
-        size_t n_gaphits = 60; // Need at least 
-        float SAFETY_DIST_WALL = 1;
+    int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
 
-        int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
+    // variables
+    double goal_angle = 0;
+    std::vector<double> gap_angles;
+    std::vector<std::vector<double>> all_gaps;
 
-        // variables
-        double goal_angle = 0;
-        std::vector<double> gap_angles;
-        std::vector<std::vector<double>> all_gaps;
+    int bubble_index_start = 0;
+    int bubble_index_end = 0;
 
-        int bubble_index_start = 0;
-        int bubble_index_end = 0;
+    sensor_msgs::msg::LaserScan scan_msg;
 
-        sensor_msgs::msg::LaserScan scan_msg;
-        
-        // subscribers
-        rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
-        
+    // subscribers
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
 
-        // publishers
-        rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
+    // publishers
+    rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
-        rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
 
-        
+    // methods
+    void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
+    // int main(int argc, char ** argv);
 
-        // methods
-        void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
-        //int main(int argc, char ** argv);
+    void visualize_lidar_ranges();
 
-        void visualize_lidar_ranges();
+    void find_gaps_by_threshold(
+        const std::vector<float> &ranges,
+        double threshold,
+        double angle_min,
+        double angle_increment,
+        std::vector<std::vector<double>> &out_all_gaps,
+        std::vector<double> &out_best_gap);
 
-        void find_gaps_by_threshold(
-            const std::vector<float>& ranges, 
-            double threshold, 
-            double angle_min, 
-            double angle_increment, 
-            std::vector<std::vector<double>>& out_all_gaps, 
-            std::vector<double>& out_best_gap
-        );
+    visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
 
-        visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
-
-        visualization_msgs::msg::Marker create_line_marker(double x1, double y1, double x2, double y2, double r, double g, double b, double width, int id);
-
-
-
-
+    visualization_msgs::msg::Marker create_line_marker(double x1, double y1, double x2, double y2, double r, double g, double b, double width, int id);
 };
-
