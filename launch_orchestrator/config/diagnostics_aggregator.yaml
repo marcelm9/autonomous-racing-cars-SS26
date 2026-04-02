@@ -3,21 +3,20 @@ diagnostics_aggregator:
     pub_rate: 1.0
     base_path: Robot
 
-    #analyzers:
-     # sensors:
-      #  diagnostic_aggregator/GenericAnalyzer
-       # path: diagnostics
+    analyzers:
+      sensors:
+        type: diagnostic_aggregator/AnalyzerGroup
+        path: diagnostics
+        analyzers:
+          lidar:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: LiDAR
+            contains:
+              - urg_node
 
-       # analyzers:
-        #  lidar:
-         #   type: diagnostic_aggregator/GenericAnalyzer
-          #  path: LiDAR
-           # contains:
-            #  - urg_node
-
-          #imu:
-           # type: diagnostic_aggregator/GenericAnalyzer
-            #path: IMU
-            #contains:
-             # - imu
-              #- IMU
+          imu:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: IMU
+            contains:
+              - imu
+              - IMU
