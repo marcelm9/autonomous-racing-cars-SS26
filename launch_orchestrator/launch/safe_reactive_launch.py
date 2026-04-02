@@ -31,20 +31,21 @@ def generate_launch_description():
             #('/drive', '/ackermann_cmd'),
         ]
     )
+
     
-    
-    # slow crash node
-    slow_crash = Node(
-        package='slow_crash',
-        executable='slow_crash',
-        name='slow_crash',
+    # reactive node
+    reactive = None(
+        package='reactive',
+        executable='reactive',
+        name='reactive',
         output='screen',
         remappings=[
+            ('/drive', '/drive_in')
         ]
     )
 
     return LaunchDescription([
         car_bringup_launch,
         safety_node,
-        slow_crash
+        reactive        
     ])
