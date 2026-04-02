@@ -320,7 +320,7 @@ void FollowGap::visualize_lidar_ranges()
 
   // viz gaps
   int num_gaps = this->all_gaps.size();
-  std::cout << num_gaps << std::endl;
+  // std::cout << num_gaps << std::endl;
   double g = 1.0;
   double b = 0.0;
   for (int i = 0; i < num_gaps; i++)

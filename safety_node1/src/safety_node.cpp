@@ -278,6 +278,7 @@ private:
         array_msg.status.push_back(status_msg);
 
         diagnostics_pub->publish(array_msg);
+        std::cout << "successfull ended callback" << std::endl;
     }
 
 
