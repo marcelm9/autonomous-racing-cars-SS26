@@ -10,22 +10,17 @@ from launch_ros.actions import Node
 def generate_launch_description():
     # Path to the car launch file
     try:
-        pkg_f1tenth_stack = get_package_share_directory('f1tenth_stack')
-        
-        basic_launch = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_f1tenth_stack, 'launch', 'bringup_launch.py')
-            )
-        )
-    
+        pkg_path = get_package_share_directory('f1tenth_stack')
+        launch_file = 'bringup_launch.py'
     except:
-        pkg_f1tenth_gym_ros = get_package_share_directory('f1tenth_gym_ros')
-    
-        basic_launch = IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_f1tenth_gym_ros, 'launch', 'gym_bridge_launch.py')
-            )
+        pkg_path = get_package_share_directory('f1tenth_gym_ros')
+        launch_file = 'gym_bridge_launch.py'
+
+    basic_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_path, 'launch', launch_file)
         )
+    )
 
     # Safety Node
     safety_node = Node(
@@ -44,7 +39,7 @@ def generate_launch_description():
 
     
     # reactive node
-    reactive = None(
+    reactive = Node(
         package='reactive',
         executable='reactive',
         name='reactive',
