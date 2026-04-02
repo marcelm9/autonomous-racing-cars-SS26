@@ -17,11 +17,13 @@ find_package(ackermann_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(diagnostic_updater REQUIRED)
 
 # add executables:
 add_executable(safety_node src/safety_node.cpp)
 ament_target_dependencies(safety_node
-  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs"
+  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs" "diagnostic_msgs" "diagnostic_updater"
 )
 
 install(TARGETS

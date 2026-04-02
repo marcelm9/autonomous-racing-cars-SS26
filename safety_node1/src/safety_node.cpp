@@ -12,6 +12,9 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
+#include "diagnostic_msgs/msg/key_value.hpp"
 
 class Safety : public rclcpp::Node {
 // The class that handles emergency braking
@@ -38,12 +41,20 @@ public:
         ebrake_engaged_pub = this->create_publisher<std_msgs::msg::Bool>("/ebrake_engaged_pub", 10);
 
         ebrake_vis_pub = this->create_publisher<visualization_msgs::msg::Marker>("/ebrake_marker", 10);
+
+        diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
         
         /* ---- services ---- */
         reset_service = this->create_service<std_srvs::srv::Trigger>( "/reset_safety_node", std::bind(&Safety::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
     
         /* ---- declared parameters ----*/
         this->declare_parameter<float>("ttc_threshold", 0.7);
+
+        // timers
+        diagnostics_timer = this->create_wall_timer(
+            std::chrono::milliseconds(1000), 
+            std::bind(&Safety::diagnostics_timer_callback, this)
+        );
 
         // publish green marker once
         publish_ebrake_marker();
@@ -67,6 +78,11 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr ebrake_engaged_pub;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ebrake_vis_pub;
+
+    rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub;
+
+    // timer
+    rclcpp::TimerBase::SharedPtr diagnostics_timer;
 
     // variables
 
@@ -239,6 +255,29 @@ private:
         }
 
         ebrake_vis_pub->publish(marker);
+    }
+
+
+    void diagnostics_timer_callback() 
+    {
+        diagnostic_msgs::msg::DiagnosticArray array_msg;
+        array_msg.header.stamp = this->now();
+
+        diagnostic_msgs::msg::DiagnosticStatus status_msg;
+        status_msg.name = "safety_node";
+        status_msg.hardware_id = "f1tenth_car";
+
+        if (this->e_brake) {
+            status_msg.level = diagnostic_msgs::msg::DiagnosticStatus::WARN;
+            status_msg.message = "E-Brake engaged!";
+        } else {
+            status_msg.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+            status_msg.message = "Safety Node Runing normally. E-Brake not engaged";
+        }
+
+        array_msg.status.push_back(status_msg);
+
+        diagnostics_pub->publish(array_msg);
     }
 
 
