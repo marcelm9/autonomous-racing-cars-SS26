@@ -7,12 +7,19 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_f1tenth_stack = get_package_share_directory('f1tenth_stack')
+    
     pkg_launch_orchestrator = get_package_share_directory('launch_orchestrator')
+    
+    try:
+        pkg_path = get_package_share_directory('f1tenth_stack')
+        launch_file = 'bringup_launch.py'
+    except:
+        pkg_path = get_package_share_directory('f1tenth_gym_ros')
+        launch_file = 'gym_bridge_launch.py'
 
     car_bringup_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(pkg_f1tenth_stack, 'launch', 'bringup_launch.py')
+            os.path.join(pkg_path, 'launch', launch_file)
         )
     )
 
