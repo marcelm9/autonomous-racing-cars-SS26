@@ -30,7 +30,7 @@ def generate_launch_description():
             # The physical car odom is usually just /odom
             ('/ego_racecar/odom', '/odom'), 
             # Make sure your safety node's drive output goes to the mux
-            ('/drive', '/ackermann_cmd_mux/input/safety'),
+            ('/drive', '/ackermann_cmd'),
         ]
     )
 
