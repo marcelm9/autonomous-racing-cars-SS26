@@ -29,7 +29,7 @@ def generate_launch_description():
         name='safety_node',
         output='screen',
         remappings=[
-            ('/drive_out', '/ackermann_cmd'),
+            ('/drive_out', '/drive'),
             ('/ego_racecar/odom', '/odom'),
         ]
     )
