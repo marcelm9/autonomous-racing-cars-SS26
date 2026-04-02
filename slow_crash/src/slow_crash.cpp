@@ -17,13 +17,13 @@ void SlowCrash::timer_callback()
 {
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
   drive_msg.drive.speed = 0.3;
-  drive_speed_pub->publish(drive_msg);
+  drive_speed->publish(drive_msg);
 }
 
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<FollowGap>());
+  rclcpp::spin(std::make_shared<SlowCrash>());
   rclcpp::shutdown();
   return 0;
 };
