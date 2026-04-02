@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         # install all launch files
         (os.path.join('share', package_name, 'launch'), glob('launch/*launch.py')),
+        (os.path.join('share', 'launch_orchestrator', 'diagnostics', 'config'), glob('diagnostics/config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

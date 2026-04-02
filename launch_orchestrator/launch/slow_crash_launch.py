@@ -41,14 +41,12 @@ def generate_launch_description():
         output='screen'
     )
 
-    diagnostics_config2 = os.path.join(
+    diagnostics_config = os.path.join(
         pkg_launch_orchestrator,
         'diagnostics',
         'config',
         'diagnostics_aggregator.yaml'
     )
-    diagnostics_config = "diagnostics_aggregr.yaml"
-    print(diagnostics_config)
 
     diagnostics_aggregator = Node(
         package='diagnostic_aggregator',
