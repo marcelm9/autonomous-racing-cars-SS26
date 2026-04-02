@@ -26,11 +26,11 @@ def generate_launch_description():
         name='safety_node',
         output='screen',
         remappings=[
-            ('/scan', '/scan'),
+            ('/drive_out', '/ackermann_cmd'),
             # The physical car odom is usually just /odom
             ('/ego_racecar/odom', '/odom'), 
             # Make sure your safety node's drive output goes to the mux
-            ('/drive', '/ackermann_cmd'),
+            #('/drive', '/ackermann_cmd'),
         ]
     )
     
