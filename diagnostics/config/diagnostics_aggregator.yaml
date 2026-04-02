@@ -3,10 +3,10 @@ diagnostics_aggregator:
     pub_rate: 1.0
     base_path: Robot
 
-    analyzers:
-      sensors:
-        diagnostic_aggregator/GenericAnalyzer
-        path: diagnostics
+    #analyzers:
+     # sensors:
+      #  diagnostic_aggregator/GenericAnalyzer
+       # path: diagnostics
 
        # analyzers:
         #  lidar:
