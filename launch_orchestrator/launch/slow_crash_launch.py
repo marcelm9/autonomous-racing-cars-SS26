@@ -8,7 +8,6 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # 1. Path to the simulator launch file
     pkg_f1tenth_stack = get_package_share_directory('f1tenth_stack')
     
     car_bringup_launch = IncludeLaunchDescription(
@@ -17,9 +16,7 @@ def generate_launch_description():
         )
     )
 
-    # 2. Your Safety Node
-    # Note: Topic names in the simulator are usually /scan and /ego_racecar/odom.
-    # If your code uses different names, use the 'remappings' argument below.
+    # Safety Node
     safety_node = Node(
         package='safety_node1',
         executable='safety_node',
@@ -27,10 +24,7 @@ def generate_launch_description():
         output='screen',
         remappings=[
             ('/drive_out', '/ackermann_cmd'),
-            # The physical car odom is usually just /odom
-            ('/ego_racecar/odom', '/odom'), 
-            # Make sure your safety node's drive output goes to the mux
-            #('/drive', '/ackermann_cmd'),
+            ('/ego_racecar/odom', '/odom')
         ]
     )
     
