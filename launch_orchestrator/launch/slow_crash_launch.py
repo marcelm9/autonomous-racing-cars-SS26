@@ -47,7 +47,7 @@ def generate_launch_description():
         'config',
         'diagnostics_aggregator.yaml'
     )
-    diagnostics_config = "diagnostics_aggregator.yaml"
+    diagnostics_config = "diagnostics_aggregr.yaml"
     print(diagnostics_config)
 
     diagnostics_aggregator = Node(
