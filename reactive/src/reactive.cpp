@@ -1,6 +1,6 @@
-#include "./../include/reactive/reactive_node.hpp"
+#include "./../include/reactive/reactive.hpp"
 
-FollowGap::FollowGap() : Node("reactive_node")
+FollowGap::FollowGap() : Node("reactive")
 {
   /* ---- subscribers ---- */
   scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
