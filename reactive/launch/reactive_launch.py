@@ -18,10 +18,10 @@ def generate_launch_description():
     # 2. Your Reactive Node
     # Note: Topic names in the simulator are usually /scan and /ego_racecar/odom.
     # If your code uses different names, use the 'remappings' argument below.
-    reactive_node = Node(
+    reactive = Node(
         package='reactive',
-        executable='reactive_node',
-        name='reactive_node',
+        executable='reactive',
+        name='reactive',
         output='screen',
         remappings=[
             # Example: ('internal_name', 'simulator_name')
@@ -32,5 +32,5 @@ def generate_launch_description():
 
     return LaunchDescription([
         sim_launch,
-        reactive_node
+        reactive
     ])

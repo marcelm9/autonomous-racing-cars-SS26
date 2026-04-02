@@ -26,4 +26,4 @@ ros2 service call /reset_safety_node std_srvs/srv/Trigger {}
 
 
 ### Launch reactive node
-ros2 launch reactive reactive_node_launch.py
+ros2 launch reactive reactive_launch.py

@@ -7,7 +7,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
@@ -17,13 +16,13 @@ find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 
 
-add_executable(reactive_node src/reactive_node.cpp)
-ament_target_dependencies(reactive_node
+add_executable(reactive src/reactive.cpp)
+ament_target_dependencies(reactive
   "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs"
 )
 
 install(TARGETS
-reactive_node
+reactive
 DESTINATION lib/${PROJECT_NAME}
 )
 
