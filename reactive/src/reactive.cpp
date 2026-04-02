@@ -88,11 +88,11 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   //// DYNAMIC GAP SEARCH ////
-  // look for a gap far away and if none is found reduce the distance untill a gap is found
+  // look for a gap far away and if none is found reduce the distance until a gap is found
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
   {
-    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / 10;
+    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
     this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty())
     {
@@ -246,7 +246,7 @@ void FollowGap::find_gaps_by_threshold(
   double temp_dist_sum = 0;
   double best_dist_sum = 0;
 
-  for (int k = static_cast<int>(num_lasers * 0.2); k < static_cast<int>(num_lasers * 0.8); k++)
+  for (int k = static_cast<int>(num_lasers * this->GAP_VIEW_ANGLE_PROCENT); k < static_cast<int>(num_lasers * (1 - this->GAP_VIEW_ANGLE_PROCENT); k++)
   {
     double angle = k * angle_increment + angle_min;
 

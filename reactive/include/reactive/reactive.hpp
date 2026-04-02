@@ -34,8 +34,12 @@ private:
 
     float MAX_THRESHOLD = 8; // Distance for the first gap search
     float MIN_THRESHOLD = 0.5;
+    int DYN_THRESHOLD_INCREMENT = 10; // How many increments of threshold should be tried
     size_t n_gaphits = 60; // Need at least
     float SAFETY_DIST_WALL = 1;
+
+    float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
+
 
     int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
 
