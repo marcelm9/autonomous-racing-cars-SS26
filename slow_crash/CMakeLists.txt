@@ -7,11 +7,20 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(ackermann_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_executable(slow_crash src/slow_crash.cpp)
+ament_target_dependencies(slow_crash
+  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs"
+)
+
+
 target_include_directories(slow_crash PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
@@ -19,6 +28,12 @@ target_compile_features(slow_crash PUBLIC c_std_99 cxx_std_17)  # Require C99 an
 
 install(TARGETS slow_crash
   DESTINATION lib/${PROJECT_NAME})
+
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
