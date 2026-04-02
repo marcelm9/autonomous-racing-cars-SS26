@@ -1,21 +1,14 @@
 diagnostics_aggregator:
-  ros__parameters:
-    pub_rate: 1.0
-    base_path: Robot
-
-    analyzers:
-      sensors:
-        type: diagnostic_aggregator/AnalyzerGroup
-        path: Sensors
-        analyzers:
+  pub_rate: 1.0 # Optional
+  base_path: '' # Optional, prepended to all diagnostic output
+  analyzers:
+    sensor:
+      type: AnalyzerGroup
+      path: diagnostics
+        analyzers: 
           imu:
-            type: diagnostic_aggregator/GenericAnalyzer
+            type: GenericAnalyzer
             path: IMU
-            contains:
-              - IMU
-
-      safety:
-        type: diagnostic_aggregator/GenericAnalyzer
-        path: Safety
-        contains:
-          - Emergency Brake
+            timeout: 5.0
+            find_and_remove_prefix: imu_node
+            num_items: 3
