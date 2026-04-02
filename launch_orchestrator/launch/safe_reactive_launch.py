@@ -17,7 +17,7 @@ def generate_launch_description():
         )
     )
 
-    #s Safety Node
+    # Safety Node
     safety_node = Node(
         package='safety_node1',
         executable='safety_node',

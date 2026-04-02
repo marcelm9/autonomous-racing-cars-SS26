@@ -6,17 +6,16 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 
-
 def generate_launch_description():
     pkg_f1tenth_stack = get_package_share_directory('f1tenth_stack')
-    
+    pkg_launch_orchestrator = get_package_share_directory('launch_orchestrator')
+
     car_bringup_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_f1tenth_stack, 'launch', 'bringup_launch.py')
         )
     )
 
-    # Safety Node
     safety_node = Node(
         package='safety_node1',
         executable='safety_node',
@@ -24,23 +23,35 @@ def generate_launch_description():
         output='screen',
         remappings=[
             ('/drive_out', '/ackermann_cmd'),
-            ('/ego_racecar/odom', '/odom')
+            ('/ego_racecar/odom', '/odom'),
         ]
     )
-    
-    
-    # slow crash node
+
     slow_crash = Node(
         package='slow_crash',
         executable='slow_crash',
         name='slow_crash',
+        output='screen'
+    )
+
+    diagnostics_config = os.path.join(
+        pkg_launch_orchestrator,
+        'diagnostics',
+        'config',
+        'diagnostics_aggregator.yaml'
+    )
+
+    diagnostics_aggregator = Node(
+        package='diagnostic_aggregator',
+        executable='aggregator_node',
+        name='diagnostics_aggregator',
         output='screen',
-        remappings=[
-        ]
+        parameters=[diagnostics_config]
     )
 
     return LaunchDescription([
         car_bringup_launch,
         safety_node,
-        slow_crash
+        slow_crash,
+        diagnostics_aggregator
     ])
