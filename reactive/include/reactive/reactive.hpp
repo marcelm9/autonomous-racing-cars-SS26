@@ -30,7 +30,8 @@ public:
 private:
     // PARAMETERS
     int SAFETYBUBBLE = 2; //
-    double NORMALDRIVESPEED = 1.5;
+    double MAXDRIVESPEED = 3;
+    double BRAKE_TUNE = 0.5;
 
     float MAX_THRESHOLD = 8; // Distance for the first gap search
     float MIN_THRESHOLD = 0.5;

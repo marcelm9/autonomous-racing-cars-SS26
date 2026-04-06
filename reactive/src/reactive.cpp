@@ -24,8 +24,41 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   std::vector<float> ranges = scan_msg->ranges;
 
-  //// WALL AVOIDANCE ////
-  // find closest distance to car on both sides so later the steering can be adjusted
+
+
+  //// DYNAMIC GAP SEARCH ////
+  // look for a gap far away and if none is found reduce the distance until a gap is found
+
+  for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
+  {
+    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
+    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
+    if (!gap_angles.empty())
+    {
+      // gap found at current threshold
+      break;
+    }
+  }
+
+  this->all_gaps = all_gaps;
+  this->gap_angles = gap_angles;
+
+
+
+  //// STEERING WITH WALL AVOIDANCE////
+  // Steer to middle of gap
+  
+  if (!gap_angles.empty())
+  {
+    this->goal_angle = gap_angles[gap_angles.size() / 2];
+  }
+  else
+  {
+    this->goal_angle = 0.0; // Default to straight if no gap found
+  }
+
+
+  // find closest distance to car on both sides so the steering can be adjusted
 
   int num_lasers = ranges.size();
   double min_distance = std::numeric_limits<float>::infinity();
@@ -59,63 +92,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   double dist_closest_right = ranges[idx_closest_right];
   double dist_closest_left = ranges[idx_closest_left];
 
-  //// SAFETY BUBBLE GENERATION ////
-  // look for the closest point and set a safety bubble around it
-
-  min_distance = std::numeric_limits<float>::infinity();
-  int idx_smallest;
-
-  for (int i = 0; i < num_lasers; i++)
-  {
-    if (ranges[i] < min_distance)
-    {
-      // find smallest range
-      min_distance = ranges[i];
-      idx_smallest = i;
-    }
-  }
-
-  // Set safety bubble around smallest distance = 0
-  int start = std::max(0, idx_smallest - static_cast<int>(this->SAFETYBUBBLE / 2));
-  int end = std::min(num_lasers - 1, idx_smallest + static_cast<int>(this->SAFETYBUBBLE / 2));
-  this->bubble_index_start = start;
-  this->bubble_index_end = end;
-
-  // set distance for points in bubble to 0
-  for (int j = start; j <= end; j++)
-  {
-    // currently disabled (by kajo)
-    //ranges[j] = 0.0;
-  }
-
-  //// DYNAMIC GAP SEARCH ////
-  // look for a gap far away and if none is found reduce the distance until a gap is found
-
-  for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
-  {
-    double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
-    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
-    if (!gap_angles.empty())
-    {
-      // gap found at current threshold
-      break;
-    }
-  }
-
-  this->all_gaps = all_gaps;
-  this->gap_angles = gap_angles;
-
-  //// STEERING ////
-
-  // Steer to middle of gap
-  if (!gap_angles.empty())
-  {
-    this->goal_angle = gap_angles[gap_angles.size() / 2];
-  }
-  else
-  {
-    this->goal_angle = 0.0; // Default to straight if no gap found
-  }
 
   // Modify steering angle if close to wall
   double angle_closest_right = idx_closest_right * angle_increment + angle_min;
@@ -126,100 +102,37 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   goal_angle = goal_angle - std::clamp((correction_left + correction_right) / 30, -0.4, 0.4);
 
-  /*
-  // Take mean ray as goal
-  if (!gap_angles.empty()){
-    std::vector<double> gap_lengths;
-    for (double angle : gap_angles)
+ 
+  //// SPEED ////
+  // Set the speed depending on the open space in front of the car
+
+  min_distance = std::numeric_limits<float>::infinity();
+  int idx_closest_front;
+
+  // front side
+  for (int i = num_lasers / 2 - 10; i < num_lasers / 2 + 10; i++)
+  {
+    if (ranges[i] < min_distance)
     {
-      int ray_idx = static_cast<int>((angle - angle_min) / angle_increment);
-      if (ray_idx>= 0 && ray_idx < static_cast<int>(ranges.size())) {
-        gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
-      }
+      // find smallest range
+      min_distance = ranges[i];
+      idx_closest_front = i;
     }
-    if (!gap_lengths.empty()) {
-      double sum = std::accumulate(gap_lengths.begin(), gap_lengths.end(), 0.0);
-      double mean = sum / static_cast<double>(gap_lengths.size());
-      double min_distance_mean = std::numeric_limits<double>::infinity();
-      int best_gap_idx = 0;
-      for (size_t i = 0; i < gap_lengths.size(); i++)
-      {
-        double distance = std::abs(gap_lengths[i] - mean);
-        if (distance < min_distance_mean)
-        {
-          min_distance_mean = distance;
-          best_gap_idx = static_cast<int>(i);
-        }
-      }
-      this->goal_angle = gap_angles[best_gap_idx];
-    } else {
-      // std::cout << "Gap_angles" << gap_angles << std::endl;
-      this->goal_angle = 0.0;
-    }
-  } else {
-    this->goal_angle = 0.0;
   }
-  */
 
-  // May ray as gives direction
-  /*
+  double speed_factor;
+  
+  speed_factor = 1.0 - std::exp(-(this->BRAKE_TUNE) * min_distance);
 
-  if (!gap_angles.empty()){
-    std::vector<double> gap_lengths;
-    for (double angle : gap_angles) {
-      int ray_idx = static_cast<int>((angle - angle_min) / angle_increment);
-      if (ray_idx>= 0 && ray_idx < static_cast<int>(ranges.size())) {
-        gap_lengths.push_back(static_cast<double>(ranges[ray_idx]));
-      }
-    }
-    if (!gap_lengths.empty()) {
-      // find largest distance
-      auto it = std::max_element(gap_lengths.begin(), gap_lengths.end());
-      int max_idx = std::distance(gap_lengths.begin(), it);
-
-      // Convert local gap index to global laser scan index
-      int global_max_idx = static_cast<int>((gap_angles[max_idx] - angle_min) / angle_increment);
-
-      // Now compare global indices safely
-      int diff_to_start = std::abs(start - global_max_idx);
-      int diff_to_end = std::abs(end - global_max_idx);
-      int diff_to_bubble = std::min(diff_to_end, diff_to_start);
-      double direction_indicator;
+  double set_speed = this->MAXDRIVESPEED * speed_factor
 
 
-      //std::cout << "diff to bubbke" << diff_to_bubble << std::endl;
-      //std::cout << "diff to bubble" << diff_to_bubble << std::endl;
-
-
-      if (diff_to_bubble > this->TO_BUBBLE_MARGIN) {
-        this->goal_angle = gap_angles[max_idx];
-        //std::cout << "   ALARM     " << idx_smallest<< std::endl;
-      } else {
-        if (diff_to_start > diff_to_end) {
-          direction_indicator = 1 *( this->TO_BUBBLE_MARGIN - diff_to_end);
-
-        } else {
-          direction_indicator = -1 * (this->TO_BUBBLE_MARGIN - diff_to_start);
-        }
-        std::cout << "   goalangle old     " << max_idx << std::endl;
-        this->goal_angle = gap_angles[max_idx + direction_indicator];
-        std::cout << "   goalangle new     " << max_idx + direction_indicator << std::endl;
-      }
-
-
-    } else {
-      //std::cout << "Gap_angles" << gap_angles << std::endl;
-      this->goal_angle = 0.0;
-    }
-  } else {
-    this->goal_angle = 0.0;
-  }
-  */
-
+  //// PUBLISH ////
+  
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
   drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.42f, 0.42f); // should be 0.34
-  drive_msg.drive.speed = this->NORMALDRIVESPEED;
+  drive_msg.drive.speed = set_speed;
   drive_speed_pub->publish(drive_msg);
 
   this->visualize_lidar_ranges();
