@@ -84,7 +84,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // set distance for points in bubble to 0
   for (int j = start; j <= end; j++)
   {
-    ranges[j] = 0.0;
+    // currently disabled (by kajo)
+    //ranges[j] = 0.0;
   }
 
   //// DYNAMIC GAP SEARCH ////
@@ -246,7 +247,7 @@ void FollowGap::find_gaps_by_threshold(
   double temp_dist_sum = 0;
   double best_dist_sum = 0;
 
-  for (int k = static_cast<int>(num_lasers * this->GAP_VIEW_ANGLE_PROCENT); k < static_cast<int>(num_lasers * (1 - this->GAP_VIEW_ANGLE_PROCENT); k++)
+  for (int k = static_cast<int>(num_lasers * this->GAP_VIEW_ANGLE_PROCENT); k < static_cast<int>(num_lasers * (1 - this->GAP_VIEW_ANGLE_PROCENT)); k++)
   {
     double angle = k * angle_increment + angle_min;
 
