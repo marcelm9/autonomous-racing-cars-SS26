@@ -122,7 +122,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   double speed_factor;
   
-  speed_factor = 1.1 - std::exp(-(this->BRAKE_TUNE) * min_distance); // offset exp by 1.1 so min value is above 0
+  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.1)); // offset exp by 0.1 so min value is above 0
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
 
