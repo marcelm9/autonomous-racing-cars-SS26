@@ -31,13 +31,12 @@ private:
     // PARAMETERS
     int SAFETYBUBBLE = 2; //
     double MAXDRIVESPEED = 3;
-    double BRAKE_TUNE = 0.5;
+    double BRAKE_TUNE = 0.5; // higher --> brake later
 
-    float MAX_THRESHOLD = 8; // Distance for the first gap search
+    float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.5;
-    int DYN_THRESHOLD_INCREMENT = 10; // How many increments of threshold should be tried
-    size_t n_gaphits = 60; // Need at least
-    float SAFETY_DIST_WALL = 1;
+    int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
+    size_t n_gaphits = 30; // Need at least
 
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
 

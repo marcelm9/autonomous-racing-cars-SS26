@@ -95,10 +95,10 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   // Modify steering angle if close to wall
   double angle_closest_right = idx_closest_right * angle_increment + angle_min;
-  double correction_right = 1 / std::pow(dist_closest_right, 2) * (1.2 / std::clamp(angle_closest_right, -1.2, 0.01));
+  double correction_right = 1 / std::pow(dist_closest_right, 2) * (1.2 / std::clamp(angle_closest_right, -1.2, 0.1));
 
   double angle_closest_left = idx_closest_left * angle_increment + angle_min;
-  double correction_left = 1 / std::pow(dist_closest_left, 2) * (1.2 / std::clamp(angle_closest_left, 0.01, 1.2));
+  double correction_left = 1 / std::pow(dist_closest_left, 2) * (1.2 / std::clamp(angle_closest_left, 0.1, 1.2));
 
   goal_angle = goal_angle - std::clamp((correction_left + correction_right) / 30, -0.4, 0.4);
 
@@ -122,9 +122,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   double speed_factor;
   
-  speed_factor = 1.0 - std::exp(-(this->BRAKE_TUNE) * min_distance);
+  speed_factor = 1.1 - std::exp(-(this->BRAKE_TUNE) * min_distance); // offset exp by 1.1 so min value is above 0
 
-  double set_speed = this->MAXDRIVESPEED * speed_factor
+  double set_speed = this->MAXDRIVESPEED * speed_factor;
 
 
   //// PUBLISH ////
