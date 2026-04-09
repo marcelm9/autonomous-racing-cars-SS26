@@ -15,6 +15,10 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/bool.hpp"
 
+#include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "diagnostic_msgs/msg/diagnostic_status.hpp"
+#include "diagnostic_msgs/msg/key_value.hpp"
+
 #pragma once
 
 // declarations:
@@ -42,6 +46,20 @@ private:
 
 
     int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
+
+    /* ---- Diagnostics ---- */
+    rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub;
+    rclcpp::TimerBase::SharedPtr diag_timer;
+    void diag_timer_callback();
+
+    /* ---- Internal State for Diagnostics ---- */
+    double diag_active_threshold_ = 0.0;
+    double diag_dist_closest_right_ = 0.0;
+    double diag_dist_closest_left_ = 0.0;
+    double diag_dist_closest_front_ = 0.0;
+    double diag_correction_left_ = 0.0;
+    double diag_correction_right_ = 0.0;
+    double diag_set_speed_ = 0.0;
 
     // variables
     double goal_angle = 0;
