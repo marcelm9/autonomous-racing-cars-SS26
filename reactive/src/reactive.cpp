@@ -7,8 +7,14 @@ FollowGap::FollowGap() : Node("reactive")
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
-
   gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 1);
+  diag_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
+
+  // publish diagnostics once per second
+  diag_timer = this->create_wall_timer(
+    std::chrono::seconds(1), 
+    std::bind(&FollowGap::diag_timer_callback, this)
+  );
 
   // variables
 }
@@ -24,8 +30,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   std::vector<float> ranges = scan_msg->ranges;
 
-
-
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
 
@@ -35,15 +39,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty())
     {
-      // gap found at current threshold
+      this->diag_active_threshold_ = threshold; // Save for diagnostics
       break;
     }
   }
 
   this->all_gaps = all_gaps;
   this->gap_angles = gap_angles;
-
-
 
   //// STEERING WITH WALL AVOIDANCE////
   // Steer to middle of gap
@@ -56,7 +58,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   {
     this->goal_angle = 0.0; // Default to straight if no gap found
   }
-
 
   // find closest distance to car on both sides so the steering can be adjusted
 
@@ -92,6 +93,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   double dist_closest_right = ranges[idx_closest_right];
   double dist_closest_left = ranges[idx_closest_left];
 
+  // Save for diagnostics
+  this->diag_dist_closest_right_ = dist_closest_right;
+  this->diag_dist_closest_left_ = dist_closest_left;
 
   // Modify steering angle if close to wall
   double angle_closest_right = idx_closest_right * angle_increment + angle_min;
@@ -100,9 +104,12 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   double angle_closest_left = idx_closest_left * angle_increment + angle_min;
   double correction_left = 1 / std::pow(dist_closest_left, 2) * (1.2 / std::clamp(angle_closest_left, 0.1, 1.2));
 
+  // Save for diagnostics
+  this->diag_correction_left_ = correction_left;
+  this->diag_correction_right_ = correction_right;
+
   goal_angle = goal_angle - std::clamp((correction_left + correction_right) / 30, -0.4, 0.4);
 
- 
   //// SPEED ////
   // Set the speed depending on the open space in front of the car
 
@@ -120,12 +127,14 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     }
   }
 
+  this->diag_dist_closest_front_ = min_distance; // Save for diagnostics
+
   double speed_factor;
   
   speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.1)); // offset exp by 0.1 so min value is above 0
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
-
+  this->diag_set_speed_ = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
   
@@ -136,6 +145,39 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   drive_speed_pub->publish(drive_msg);
 
   this->visualize_lidar_ranges();
+}
+
+void FollowGap::diag_timer_callback()
+{
+  diagnostic_msgs::msg::DiagnosticArray diag_msg;
+  diag_msg.header.stamp = this->get_clock()->now();
+
+  diagnostic_msgs::msg::DiagnosticStatus status;
+  status.name = "FollowGap Internal State";
+  status.hardware_id = "ego_racecar"; 
+  status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+  status.message = "Publishing Debug State";
+
+  // Lambda helper to quickly add KeyValue pairs
+  auto add_kv = [&status](const std::string& key, double value) {
+    diagnostic_msgs::msg::KeyValue kv;
+    kv.key = key;
+    kv.value = std::to_string(value);
+    status.values.push_back(kv);
+  };
+
+  add_kv("1_goal_angle_final", this->goal_angle);
+  add_kv("2_target_speed", this->diag_set_speed_);
+  add_kv("3_active_threshold", this->diag_active_threshold_);
+  add_kv("4_num_gaps_found", static_cast<double>(this->all_gaps.size()));
+  add_kv("5_dist_closest_front", this->diag_dist_closest_front_);
+  add_kv("6_dist_closest_left", this->diag_dist_closest_left_);
+  add_kv("7_dist_closest_right", this->diag_dist_closest_right_);
+  add_kv("8_correction_left", this->diag_correction_left_);
+  add_kv("9_correction_right", this->diag_correction_right_);
+
+  diag_msg.status.push_back(status);
+  diag_pub->publish(diag_msg);
 }
 
 void FollowGap::find_gaps_by_threshold(
@@ -234,7 +276,6 @@ void FollowGap::visualize_lidar_ranges()
 
   // viz gaps
   int num_gaps = this->all_gaps.size();
-  // std::cout << num_gaps << std::endl;
   double g = 1.0;
   double b = 0.0;
   for (int i = 0; i < num_gaps; i++)
@@ -261,7 +302,6 @@ void FollowGap::visualize_lidar_ranges()
     double y2 = std::sin(angle_right) * ranges[index2];
 
     double temp = g;
-    ;
     g = b;
     b = temp;
     visualization_msgs::msg::Marker line_left_marker = this->create_line_marker(0, 0, x1, y1, 0.0, g, b, 0.01, 2 * i + 1);
