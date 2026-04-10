@@ -8,6 +8,7 @@
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
@@ -69,6 +70,8 @@ private:
     int bubble_index_start = 0;
     int bubble_index_end = 0;
 
+    bool oh_no_im_stuck = false;
+
     sensor_msgs::msg::LaserScan scan_msg;
 
     // subscribers
@@ -78,6 +81,7 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr no_way_out_pub;
 
     // methods
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
