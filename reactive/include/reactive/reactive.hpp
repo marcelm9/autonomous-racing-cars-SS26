@@ -45,7 +45,12 @@ private:
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
     double MAX_DIST_STEER = 1;
 
+    double SIGMA_FRONT = 0.5;
+    double SIGMA_SIDE = 0.2;
+    double SIGMA_AMPLITUDE = 0.8;
+
     int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
+    
 
     /* ---- Diagnostics ---- */
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub;
@@ -53,13 +58,13 @@ private:
     void diag_timer_callback();
 
     /* ---- Internal State for Diagnostics ---- */
-    double diag_active_threshold_ = 0.0;
-    double diag_dist_closest_right_ = 0.0;
-    double diag_dist_closest_left_ = 0.0;
-    double diag_dist_closest_front_ = 0.0;
-    double diag_correction_left_ = 0.0;
-    double diag_correction_right_ = 0.0;
-    double diag_set_speed_ = 0.0;
+    double diag_active_threshold = 0.0;
+    double diag_dist_closest_right = 0.0;
+    double diag_dist_closest_left = 0.0;
+    double diag_dist_closest_front = 0.0;
+    double diag_correction_left = 0.0;
+    double diag_correction_right = 0.0;
+    double diag_set_speed = 0.0;
 
     // variables
     double goal_angle = 0;
@@ -69,15 +74,15 @@ private:
     int bubble_index_start = 0;
     int bubble_index_end = 0;
 
-    int closest_idx_right_ = -1;
-    int closest_idx_left_ = -1;
-    double closest_angle_right_ = 0.0;
-    double closest_angle_left_ = 0.0;
-    double closest_dist_right_ = 0.0;
-    double closest_dist_left_ = 0.0;
+    int closest_idx_right = -1;
+    int closest_idx_left = -1;
+    double closest_angle_right = 0.0;
+    double closest_angle_left = 0.0;
+    double closest_dist_right = 0.0;
+    double closest_dist_left = 0.0;
 
-    double goal_angle_before_width_clamp_ = 0.0;
-    double goal_angle_before_steer_clamp_ = 0.0;
+    double goal_angle_before_width_clamp = 0.0;
+    double goal_angle_before_steer_clamp = 0.0;
 
     sensor_msgs::msg::LaserScan scan_msg;
 
