@@ -70,7 +70,9 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       no_way_out_pub->publish(message);
 
       oh_no_im_stuck = true;
+
     }
+    this->goal_angle = 0;
   }
 
   // find closest distance to car on both sides so the steering can be adjusted
@@ -159,7 +161,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   // double speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance - 0.1)); // offset exp by 0.1 so min value is above 0
 
-  double set_speed = this->MAXDRIVESPEED * speed_factor;
+  double set_speed = oh_no_im_stuck ? 0 : this->MAXDRIVESPEED * speed_factor;
   this->diag_set_speed_ = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
