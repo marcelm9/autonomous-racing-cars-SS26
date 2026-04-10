@@ -8,6 +8,7 @@
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "visualization_msgs/msg/marker_array.hpp"
@@ -38,9 +39,9 @@ private:
     double BRAKE_TUNE = 0.2; // higher --> brake later
 
     float MAX_THRESHOLD = 15; // Distance for the first gap search
-    float MIN_THRESHOLD = 0.5;
+    float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t n_gaphits = 30; // Need at least
+    size_t n_gaphits = 20; // Need at least
 
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
     double MAX_DIST_STEER = 1;
@@ -84,6 +85,8 @@ private:
     double goal_angle_before_width_clamp = 0.0;
     double goal_angle_before_steer_clamp = 0.0;
 
+    bool oh_no_im_stuck = false;
+
     sensor_msgs::msg::LaserScan scan_msg;
 
     // subscribers
@@ -93,6 +96,7 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr oh_no_im_stuck_publisher;
 
     // methods
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);

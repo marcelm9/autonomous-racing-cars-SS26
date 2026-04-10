@@ -9,12 +9,12 @@ FollowGap::FollowGap() : Node("reactive")
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
   gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 1);
   diag_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
+  oh_no_im_stuck_publisher = this->create_publisher<std_msgs::msg::String>("/oh_no_im_stuck", 1);
 
   // publish diagnostics once per second
   diag_timer = this->create_wall_timer(
-    std::chrono::seconds(1), 
-    std::bind(&FollowGap::diag_timer_callback, this)
-  );
+      std::chrono::seconds(1),
+      std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
 }
@@ -49,14 +49,31 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   //// STEERING WITH WALL AVOIDANCE////
   // Steer to middle of gap
-  
+
   if (!gap_angles.empty())
   {
     this->goal_angle = gap_angles[gap_angles.size() / 2];
+    if (oh_no_im_stuck)
+    {
+      auto message = std_msgs::msg::String();
+      message.data = "gap found again, i owe you my life";
+      oh_no_im_stuck_publisher->publish(message);
+
+      oh_no_im_stuck = false;
+    }
   }
   else
   {
-    this->goal_angle = 0.0; // Default to straight if no gap found
+    if (!oh_no_im_stuck)
+    {
+      auto message = std_msgs::msg::String();
+      message.data = "no gap found, i will die here";
+      oh_no_im_stuck_publisher->publish(message);
+
+      oh_no_im_stuck = true;
+
+    }
+    this->goal_angle = 0;
   }
 
   // find closest distance to car on both sides of the selected gap so the steering can be adjusted
@@ -229,14 +246,21 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->diag_dist_closest_front = min_distance; // Save for diagnostics
 
   double speed_factor;
-  
-  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.1)); // offset exp by 0.1 so min value is above 0
+  if (min_distance >= BRAKE_DIST)
+  {
+    speed_factor = 1.0; // full throttle
+  }
+  else
+  {
+    // linear ramp from MIN_SPEED (at 0 m) to MAXDRIVESPEED (at BRAKE_DIST)
+    speed_factor = MIN_SPEED / this->MAXDRIVESPEED + (1.0 - MIN_SPEED / this->MAXDRIVESPEED) * (min_distance / BRAKE_DIST);
+  }
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
   this->diag_set_speed = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
-  
+
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
   drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.42f, 0.42f); // should be 0.34
@@ -253,12 +277,13 @@ void FollowGap::diag_timer_callback()
 
   diagnostic_msgs::msg::DiagnosticStatus status;
   status.name = "FollowGap Internal State";
-  status.hardware_id = "ego_racecar"; 
+  status.hardware_id = "ego_racecar";
   status.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
   status.message = "Publishing Debug State";
 
   // Lambda helper to quickly add KeyValue pairs
-  auto add_kv = [&status](const std::string& key, double value) {
+  auto add_kv = [&status](const std::string &key, double value)
+  {
     diagnostic_msgs::msg::KeyValue kv;
     kv.key = key;
     kv.value = std::to_string(value);
