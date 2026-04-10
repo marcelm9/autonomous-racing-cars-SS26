@@ -228,8 +228,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   //// SPEED ////
   // Set the speed depending on the open space in front of the car
-
-  min_distance = std::numeric_limits<float>::infinity();
+min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_front;
 
   // front side
@@ -246,15 +245,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->diag_dist_closest_front = min_distance; // Save for diagnostics
 
   double speed_factor;
-  if (min_distance >= BRAKE_DIST)
-  {
-    speed_factor = 1.0; // full throttle
-  }
-  else
-  {
-    // linear ramp from MIN_SPEED (at 0 m) to MAXDRIVESPEED (at BRAKE_DIST)
-    speed_factor = MIN_SPEED / this->MAXDRIVESPEED + (1.0 - MIN_SPEED / this->MAXDRIVESPEED) * (min_distance / BRAKE_DIST);
-  }
+  
+  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.1)); // offset exp by 0.1 so min value is above 0
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
   this->diag_set_speed = set_speed; // Save for diagnostics
