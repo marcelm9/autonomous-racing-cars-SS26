@@ -9,8 +9,7 @@ FollowGap::FollowGap() : Node("reactive")
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
   gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 1);
   diag_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
-  no_way_out_pub = this->create_publisher<std_msgs::msg::String>("/no_way_out", 1);
-
+  oh_no_im_stuck_publisher = this->create_publisher<std_msgs::msg::String>("/oh_no_im_stuck", 1);
 
   // publish diagnostics once per second
   diag_timer = this->create_wall_timer(
@@ -54,20 +53,22 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   if (!gap_angles.empty())
   {
     this->goal_angle = gap_angles[gap_angles.size() / 2];
-    if (oh_no_im_stuck) {
+    if (oh_no_im_stuck)
+    {
       auto message = std_msgs::msg::String();
-      message.data = "gap found again, i owe you my life";      
-      no_way_out_pub->publish(message);
+      message.data = "gap found again, i owe you my life";
+      oh_no_im_stuck_publisher->publish(message);
 
       oh_no_im_stuck = false;
     }
   }
   else
   {
-    if (!oh_no_im_stuck) {
+    if (!oh_no_im_stuck)
+    {
       auto message = std_msgs::msg::String();
-      message.data = "no gap found, i will die here";      
-      no_way_out_pub->publish(message);
+      message.data = "no gap found, i will die here";
+      oh_no_im_stuck_publisher->publish(message);
 
       oh_no_im_stuck = true;
     }
@@ -142,17 +143,18 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // Aggressive speed: full throttle above BRAKE_DIST, linear falloff below
-  const double BRAKE_DIST = 2.0;   // metres — tune this
-  const double MIN_SPEED  = 0.5;   // never go slower than this (avoids stalling)
+  const double BRAKE_DIST = 2.0; // metres — tune this
+  const double MIN_SPEED = 0.5;  // never go slower than this (avoids stalling)
 
   double speed_factor;
-  if (min_distance >= BRAKE_DIST) {
-      speed_factor = 1.0;           // full throttle
-  } else {
-      // linear ramp from MIN_SPEED (at 0 m) to MAXDRIVESPEED (at BRAKE_DIST)
-      speed_factor = MIN_SPEED / this->MAXDRIVESPEED
-                  + (1.0 - MIN_SPEED / this->MAXDRIVESPEED)
-                    * (min_distance / BRAKE_DIST);
+  if (min_distance >= BRAKE_DIST)
+  {
+    speed_factor = 1.0; // full throttle
+  }
+  else
+  {
+    // linear ramp from MIN_SPEED (at 0 m) to MAXDRIVESPEED (at BRAKE_DIST)
+    speed_factor = MIN_SPEED / this->MAXDRIVESPEED + (1.0 - MIN_SPEED / this->MAXDRIVESPEED) * (min_distance / BRAKE_DIST);
   }
 
   // this->diag_dist_closest_front_ = min_distance; // Save for diagnostics

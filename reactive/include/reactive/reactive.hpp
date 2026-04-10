@@ -39,9 +39,9 @@ private:
     double BRAKE_TUNE = 0.5; // higher --> brake later
 
     float MAX_THRESHOLD = 15; // Distance for the first gap search
-    float MIN_THRESHOLD = 0.5;
+    float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t n_gaphits = 30; // Need at least
+    size_t n_gaphits = 20; // Need at least
 
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
 
@@ -81,7 +81,7 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr no_way_out_pub;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr oh_no_im_stuck_publisher;
 
     // methods
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
