@@ -141,11 +141,23 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     }
   }
 
-  this->diag_dist_closest_front_ = min_distance; // Save for diagnostics
+  // Aggressive speed: full throttle above BRAKE_DIST, linear falloff below
+  const double BRAKE_DIST = 2.0;   // metres — tune this
+  const double MIN_SPEED  = 0.5;   // never go slower than this (avoids stalling)
 
   double speed_factor;
+  if (min_distance >= BRAKE_DIST) {
+      speed_factor = 1.0;           // full throttle
+  } else {
+      // linear ramp from MIN_SPEED (at 0 m) to MAXDRIVESPEED (at BRAKE_DIST)
+      speed_factor = MIN_SPEED / this->MAXDRIVESPEED
+                  + (1.0 - MIN_SPEED / this->MAXDRIVESPEED)
+                    * (min_distance / BRAKE_DIST);
+  }
 
-  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance - 0.1)); // offset exp by 0.1 so min value is above 0
+  // this->diag_dist_closest_front_ = min_distance; // Save for diagnostics
+
+  // double speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance - 0.1)); // offset exp by 0.1 so min value is above 0
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
   this->diag_set_speed_ = set_speed; // Save for diagnostics
