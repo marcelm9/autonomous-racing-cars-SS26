@@ -46,9 +46,9 @@ private:
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
     double MAX_DIST_STEER = 1;
 
-    double SIGMA_FRONT = 4.4;
-    double SIGMA_SIDE = 0.3;
-    double SIGMA_AMPLITUDE = 0.8;
+    double SIGMA_FRONT = 2.4;
+    double SIGMA_SIDE = 0.2;
+    double SIGMA_AMPLITUDE = 0.4;
 
     
     /* ---- Diagnostics ---- */
