@@ -30,3 +30,9 @@ ros2 launch reactive reactive_launch.py
 
 ### Launch reactive and safety node
 ros2 launch launch_orchestrator safe_reactive_launch.py
+
+# VESC config
+- steering_angle_to_servo_gain: -1.8
+- steering_angle_to_servo_offset: 0.56
+- servo_min: 0.175
+- servo_max: 0.99
