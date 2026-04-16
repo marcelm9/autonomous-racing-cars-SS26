@@ -76,16 +76,17 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->goal_angle = 0;
   }
 
-  // find closest distance to car on both sides of the selected gap so the steering can be adjusted
+
 
   int num_lasers = ranges.size();
   double min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_right = -1;
   int idx_closest_left = -1;
 
-  const double MAX_RELEVANT_ANGLE = M_PI_2; // ignore walls behind the car
+  const double MAX_RELEVANT_ANGLE = M_PI_2/1.4; // ignore walls behind the car
   const double REAR_CLEARANCE = 0.2;      // ignore obstacles too far behind for a rear tire hit
 
+  // check if a ray is relevant for wall avoidance (in front of the car and valid)
   auto is_relevant_ray = [&](int i) {
     double angle = i * angle_increment + angle_min;
     if (std::abs(angle) > MAX_RELEVANT_ANGLE)
@@ -105,108 +106,108 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     gap_start_idx = static_cast<int>((gap_angles.front() - angle_min) / angle_increment);
     gap_end_idx = static_cast<int>((gap_angles.back() - angle_min) / angle_increment);
   }
-// only consider rays outside of the gap if a valid gap was found
+  // only consider rays outside of the gap if a valid gap was found
   bool use_gap_bounds = (gap_start_idx >= 0 && gap_end_idx >= 0 && gap_start_idx < gap_end_idx); 
   int right_start = 0;
   int right_end = use_gap_bounds ? gap_start_idx - 1 : num_lasers / 2 - 1;
   int left_start = use_gap_bounds ? gap_end_idx + 1 : num_lasers / 2;
   int left_end = num_lasers - 1;
 
-  // right side (right of the selected gap)
+  // cumulative repulsive force from the right wall
+  double correction_right = 0.0;
   for (int i = right_start; i <= right_end; i++)
   {
     if (!is_relevant_ray(i))
       continue;
+    
+    // track closest point for geometric width constraint
     if (ranges[i] < min_distance)
     {
       min_distance = ranges[i];
       idx_closest_right = i;
     }
-  }
 
-  min_distance = std::numeric_limits<float>::infinity();
+    // Cumulative steering force from the right wall, using an elliptical Gaussian to weight points more if they are in front of the car
+    double angle = i * angle_increment + angle_min;
+    double dist = static_cast<double>(ranges[i]);
+    double ellipse = (this->SIGMA_FRONT * this->SIGMA_SIDE) /
+        std::sqrt(std::pow(this->SIGMA_SIDE * std::cos(angle), 2) + std::pow(this->SIGMA_FRONT * std::sin(angle), 2));
+    
+    correction_right += std::exp(-(std::pow(dist, 2) / (2 * ellipse * ellipse)));
+  }
+  // Scale by angle_increment to make the integral independent of LIDAR resolution
+  correction_right *= (angle_increment * this->SIGMA_AMPLITUDE);
+
+  double min_distance_left = std::numeric_limits<float>::infinity();
+  double correction_left = 0.0;
 
   // left side (left of the selected gap)
   for (int i = left_start; i <= left_end; i++)
   {
     if (!is_relevant_ray(i))
       continue;
-    if (ranges[i] < min_distance)
+    
+    // track closest point for geometric width constraint
+    if (ranges[i] < min_distance_left)
     {
-      min_distance = ranges[i];
+      min_distance_left = ranges[i];
       idx_closest_left = i;
     }
+
+    // Cumulative steering force from the left wall, using an elliptical Gaussian to weight points more if they are in front of the car
+    double angle = i * angle_increment + angle_min;
+    double dist = static_cast<double>(ranges[i]);
+    double ellipse = (this->SIGMA_FRONT * this->SIGMA_SIDE) /
+        std::sqrt(std::pow(this->SIGMA_SIDE * std::cos(angle), 2) + std::pow(this->SIGMA_FRONT * std::sin(angle), 2));
+    
+    correction_left += std::exp(-(std::pow(dist, 2) / (2 * ellipse * ellipse)));
   }
+  correction_left *= (angle_increment * this->SIGMA_AMPLITUDE);
 
-  double dist_closest_right = this->MAX_DIST_STEER;
-  double dist_closest_left = this->MAX_DIST_STEER;
-  double angle_closest_right = 0.0;
-  double angle_closest_left = 0.0;
-
-  if (idx_closest_right >= 0)
-  {
-    dist_closest_right = std::clamp(static_cast<double>(ranges[idx_closest_right]), 0.1, this->MAX_DIST_STEER);
-    angle_closest_right = idx_closest_right * angle_increment + angle_min;
+  // Update closest point state for visualization/diagnostics
+  if (idx_closest_right >= 0) {
     this->closest_idx_right = idx_closest_right;
-    this->closest_angle_right = angle_closest_right;
-    this->closest_dist_right = dist_closest_right;
-  }
-  else
-  {
+    this->closest_angle_right = idx_closest_right * angle_increment + angle_min;
+    this->closest_dist_right = ranges[idx_closest_right];
+    this->diag_dist_closest_right = this->closest_dist_right;
+  } else {
     this->closest_idx_right = -1;
+    this->diag_dist_closest_right = this->MAX_DIST_STEER;
   }
 
-  if (idx_closest_left >= 0)
-  {
-    dist_closest_left = std::clamp(static_cast<double>(ranges[idx_closest_left]), 0.1, this->MAX_DIST_STEER);
-    angle_closest_left = idx_closest_left * angle_increment + angle_min;
+  if (idx_closest_left >= 0) {
     this->closest_idx_left = idx_closest_left;
-    this->closest_angle_left = angle_closest_left;
-    this->closest_dist_left = dist_closest_left;
-  }
-  else
-  {
+    this->closest_angle_left = idx_closest_left * angle_increment + angle_min;
+    this->closest_dist_left = ranges[idx_closest_left];
+    this->diag_dist_closest_left = this->closest_dist_left;
+  } else {
     this->closest_idx_left = -1;
+    this->diag_dist_closest_left = this->MAX_DIST_STEER;
   }
 
-  this->goal_angle_before_width_clamp = this->goal_angle; // Save for visualization before width-based clamping
+  this->diag_correction_left = correction_left;
+  this->diag_correction_right = correction_right;
 
-  // set goal angle to be 2 times the car width away from closest wall
-  const double half_car_width = 4*0.2032 / 2.0;
-  double max_right_goal = 0;
-  double width_angle_right =0;
+  this->goal_angle_before_width_clamp = this->goal_angle; // Save for visualization
+
+  // Geometric safety: ensure we steer far enough to clear the car's width
+  const double half_car_width = 6*0.2032 / 2.0; // approx 0.4m
 
   if (idx_closest_right >= 0)
   {
-     width_angle_right = std::atan(half_car_width / dist_closest_right);
-    max_right_goal = angle_closest_right + width_angle_right; // move goal back toward center if right wall is too close
+    double width_angle_right = std::atan(half_car_width / this->closest_dist_right);
+    double max_right_goal = this->closest_angle_right + width_angle_right; // move goal back toward center if right wall is too close
     this->goal_angle = std::max(this->goal_angle, max_right_goal); // only adjust if goal angle is inside car width area
   }
 
   if (idx_closest_left >= 0)
   {
-    double width_angle_left = std::atan(half_car_width / dist_closest_left);
-    double min_left_goal = angle_closest_left - width_angle_left; // move goal back toward center if left wall is too close
+    double width_angle_left = std::atan(half_car_width / this->closest_dist_left);
+    double min_left_goal = this->closest_angle_left - width_angle_left; // move goal back toward center if left wall is too close
     this->goal_angle = std::min(this->goal_angle, min_left_goal); // only adjust if goal angle is inside car width area
   }
 
-  this->goal_angle_before_steer_clamp = this->goal_angle; // Save for visualization before width-based clamping
-
-  double proximity_right = this->MAX_DIST_STEER - dist_closest_right;
-  double proximity_left = this->MAX_DIST_STEER - dist_closest_left;
-
-  // use a eliptical gaussian bell for correction calculation
-  double ellipse_right = (this->SIGMA_FRONT * this->SIGMA_SIDE) /
-      std::sqrt(std::pow(this->SIGMA_SIDE * std::cos(angle_closest_right), 2) + std::pow(this->SIGMA_FRONT * std::sin(angle_closest_right), 2));
-  double ellipse_left = (this->SIGMA_FRONT * this->SIGMA_SIDE) /
-      std::sqrt(std::pow(this->SIGMA_SIDE * std::cos(angle_closest_left), 2) + std::pow(this->SIGMA_FRONT * std::sin(angle_closest_left), 2));
-
-  double correction_right = (idx_closest_right >= 0)
-      ? this->SIGMA_AMPLITUDE * std::exp(-(std::pow(dist_closest_right, 2) / (2 * ellipse_right * ellipse_right)))
-      : 0.0;
-  double correction_left = (idx_closest_left >= 0)
-      ? this->SIGMA_AMPLITUDE * std::exp(-(std::pow(dist_closest_left, 2) / (2 * ellipse_left * ellipse_left)))
-      : 0.0;
+  this->goal_angle_before_steer_clamp = this->goal_angle; // Save for visualization
 
   const double STEER_LIMIT = 0.42;
 
@@ -223,12 +224,12 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // set final goal angle 
-  goal_angle = goal_angle - correction_left + correction_right;
+  goal_angle = (goal_angle - correction_left + correction_right)/1.5;
 
 
   //// SPEED ////
   // Set the speed depending on the open space in front of the car
-min_distance = std::numeric_limits<float>::infinity();
+  min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_front;
 
   // front side
@@ -246,7 +247,7 @@ min_distance = std::numeric_limits<float>::infinity();
 
   double speed_factor;
   
-  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.1)); // offset exp by 0.1 so min value is above 0
+  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.01)); // offset exp by 0.1 so min value is above 0
 
   double set_speed = this->MAXDRIVESPEED * speed_factor;
   this->diag_set_speed = set_speed; // Save for diagnostics
@@ -481,7 +482,7 @@ void FollowGap::visualize_lidar_ranges()
   ellipse_marker.color.b = 0.0;
   ellipse_marker.color.a = 0.8;
 
-  double sigma_f = 1.0; 
+  double sigma_f = 2.0; 
   double sigma_s = 0.3;
   double ellipse_offset = 0.5;
 
