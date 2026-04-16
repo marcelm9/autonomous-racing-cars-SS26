@@ -314,18 +314,32 @@ class ParticleFiler(Node):
         pa.poses = Utils.particles_to_poses(particles)
         self.particle_pub.publish(pa)
 
+
     def publish_scan(self, angles, ranges):
-        # publish the given angels and ranges as a laser scan message
         ls = LaserScan()
         ls.header.stamp = self.last_stamp
-        ls.header.frame_id = '/laser'
-        ls.angle_min = np.min(angles)
-        ls.angle_max = np.max(angles)
-        ls.angle_increment = np.abs(angles[0] - angles[1])
-        ls.range_min = 0
-        ls.range_max = np.max(ranges)
-        ls.ranges = ranges
+        ls.header.frame_id = 'laser'
+        ls.angle_min = float(np.min(angles))
+        ls.angle_max = float(np.max(angles))
+        ls.angle_increment = float(abs(float(angles[1]) - float(angles[0])))
+        ls.range_min = 0.0
+        ls.range_max = float(np.max(ranges))
+        ls.ranges = [float(r) for r in ranges]
         self.pub_fake_scan.publish(ls)
+
+    
+    # def publish_scan(self, angles, ranges):
+    #     # publish the given angels and ranges as a laser scan message
+    #     ls = LaserScan()
+    #     ls.header.stamp = self.last_stamp
+    #     ls.header.frame_id = '/laser'
+    #     ls.angle_min = np.min(angles)
+    #     ls.angle_max = np.max(angles)
+    #     ls.angle_increment = np.abs(angles[0] - angles[1])
+    #     ls.range_min = 0
+    #     ls.range_max = np.max(ranges)
+    #     ls.ranges = ranges
+    #     self.pub_fake_scan.publish(ls)
 
     def lidarCB(self, msg):
         '''
