@@ -35,24 +35,22 @@ public:
 private:
     // PARAMETERS
     int SAFETYBUBBLE = 2; //
-    double MAXDRIVESPEED = 4.5;
-    double BRAKE_TUNE = 0.2; // higher --> brake later
+    double MAXDRIVESPEED = 20;
+    double BRAKE_TUNE = 0.075; // higher --> brake later
 
     float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t n_gaphits = 20; // Need at least
+    size_t n_gaphits = 30; // Need at least
 
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
     double MAX_DIST_STEER = 1;
 
-    double SIGMA_FRONT = 0.5;
-    double SIGMA_SIDE = 0.2;
+    double SIGMA_FRONT = 4.4;
+    double SIGMA_SIDE = 0.3;
     double SIGMA_AMPLITUDE = 0.8;
 
-    int TO_BUBBLE_MARGIN = 10; // minimum ray index count margin of the steering to the safety bubble
     
-
     /* ---- Diagnostics ---- */
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub;
     rclcpp::TimerBase::SharedPtr diag_timer;
