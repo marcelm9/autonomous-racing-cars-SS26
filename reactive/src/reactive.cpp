@@ -209,7 +209,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   this->goal_angle_before_steer_clamp = this->goal_angle; // Save for visualization
 
-  const double STEER_LIMIT = 0.42;
+  const double STEER_LIMIT = 0.2;
 
   // limit the correction so it does not exceed the steer limit when added to the goal angle
   if (goal_angle >= 0.0)
@@ -256,7 +256,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.42f, 0.42f); // should be 0.34
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.2f, 0.2f); // should be 0.34
   drive_msg.drive.speed = set_speed;
   drive_speed_pub->publish(drive_msg);
 
