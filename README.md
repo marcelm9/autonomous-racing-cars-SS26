@@ -32,6 +32,8 @@ ros2 launch reactive reactive_launch.py
 ros2 launch launch_orchestrator safe_reactive_launch.py
 
 # VESC config
+- speed_to_erpm_gain: 7500.0
+- speed_to_erpm_offset: -32.0
 - steering_angle_to_servo_gain: -1.8
 - steering_angle_to_servo_offset: 0.56
 - servo_min: 0.175
