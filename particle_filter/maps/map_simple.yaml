@@ -1,4 +1,4 @@
-image: TestTimToll.pgm
+image: map_simple.pgm
 mode: trinary
 resolution: 0.050
 origin: [-3.419, -5.088, 0]
