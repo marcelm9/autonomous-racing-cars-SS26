@@ -47,10 +47,11 @@ The config file for the particle filter is located [here](~/racecar_ws/src/arc_r
 
 1) `ros2 launch reactive car_reactive_launch.py`
 2) `ros2 launch launch_orchestrator slam_toolbox_launch.py`
-3) `ros2 run nav2_map_server map_saver_cli -f ~/racecar_ws/src/arc_riders/particle_filter/maps/MAP_NAME_HERE`
-4) kill slam process
-5) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
-6) rebuild (`cd ~/racecar_ws && cb && src`)
-7) `ros2 launch particle_filter localize_launch.py`
+3) drive around the map to build it (2 - 3 laps recommended), then contine with the next step
+4) `ros2 run nav2_map_server map_saver_cli -f ~/racecar_ws/src/arc_riders/particle_filter/maps/MAP_NAME_HERE`
+5) kill slam process
+6) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
+7) rebuild (`cd ~/racecar_ws && cb && src`)
+8) `ros2 launch particle_filter localize_launch.py`
 
 To have a visualization of the map just run rviz2 with the `/map` topic. To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
