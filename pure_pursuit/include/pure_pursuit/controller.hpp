@@ -1,8 +1,13 @@
+#ifndef PURE_PURSUIT_CONTROLLER_HPP
+#define PURE_PURSUIT_CONTROLLER_HPP
+
 #include <cstdio>
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
 #include <limits>
+
+#include <chrono>
 
 #include "rclcpp/rclcpp.hpp"
 /// CHECK: include needed ROS msg type headers and libraries
@@ -35,6 +40,7 @@ public:
 
 private:
     // PARAMETERS
+
     
 
     
@@ -45,14 +51,14 @@ private:
     
 
     // variables
+    nav_msgs::msg::Path current_path;
+    tf2_msgs::msg::TFMessage tf_tree;
+   
 
 
     // subscribers
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub; 
-    
-   
-
     
 
     // publishers
@@ -62,5 +68,11 @@ private:
     // methods
     void tf_callback(const tf2_msgs::msg::TFMessage::SharedPtr msg);
     void path_callback(const nav_msgs::msg::Path::SharedPtr msg);
+
+    // timer
+    rclcpp::TimerBase::SharedPtr pure_persuit_timer;
+    void pure_persuit_timer_callback();
     
 };
+
+#endif
