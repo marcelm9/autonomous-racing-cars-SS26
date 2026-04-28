@@ -48,13 +48,14 @@ private:
     sensor_msgs::msg::LaserScan scan_msg;
 
     // subscribers
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
+    rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf;
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub;    
+
+    
 
     // publishers
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr oh_no_im_stuck_publisher;
 
     // methods
     
