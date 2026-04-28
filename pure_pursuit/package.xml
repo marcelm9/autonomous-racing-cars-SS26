@@ -15,4 +15,16 @@
   <export>
     <build_type>ament_cmake</build_type>
   </export>
+
+    <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>ackermann_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>std_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>tf2_msgs</depend>
+  <depend>simple_raceline</depend>
+  
 </package>

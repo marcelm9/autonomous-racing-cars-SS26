@@ -4,9 +4,10 @@
 controller::controller() : Node("controller")
 {
   /* ---- subscribers ---- */
-  scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
-  tf = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", 10, std::bind(&FollowGap::tf_callback, this, std::placeholders::_1));
-  path_sub = this->create_subscription<nav_msgs::msg::Path>("/global_path", 10, std::bind(&FollowGap::path_callback, this, std::placeholders::_1));
+  scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
+    "/scan", 10, std::bind(&controller::scan_callback, this, std::placeholders::_1));
+  tf = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", 10, std::bind(&controller::tf_callback, this, std::placeholders::_1));
+  path_sub = this->create_subscription<nav_msgs::msg::Path>("/global_path", 10, std::bind(&controller::path_callback, this, std::placeholders::_1));
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
@@ -20,7 +21,7 @@ controller::controller() : Node("controller")
       std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
-  
+
 }
 
 int main(int argc, char ** argv)
