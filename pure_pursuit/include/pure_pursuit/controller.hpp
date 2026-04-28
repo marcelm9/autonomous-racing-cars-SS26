@@ -25,6 +25,9 @@
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
+#include "tf2_ros/buffer.hpp"
+#include "tf2_ros/transform_listener.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 #pragma once
 
@@ -42,7 +45,8 @@ private:
     // PARAMETERS
 
     
-
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     
     /* ---- Diagnostics ---- */
     
@@ -52,12 +56,11 @@ private:
 
     // variables
     nav_msgs::msg::Path current_path;
-    tf2_msgs::msg::TFMessage tf_tree;
-   
+    bool path_received_ = false;
+    double L = 1.0;
 
 
     // subscribers
-    rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub; 
     
 
@@ -66,7 +69,6 @@ private:
 
 
     // methods
-    void tf_callback(const tf2_msgs::msg::TFMessage::SharedPtr msg);
     void path_callback(const nav_msgs::msg::Path::SharedPtr msg);
 
     // timer
