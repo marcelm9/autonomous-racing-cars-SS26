@@ -8,6 +8,7 @@
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "visualization_msgs/msg/marker.hpp"
@@ -15,7 +16,7 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/bool.hpp"
-
+#include "tf2_msgs/msg/tf_message.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
 #include "diagnostic_msgs/msg/diagnostic_status.hpp"
 #include "diagnostic_msgs/msg/key_value.hpp"
@@ -45,11 +46,12 @@ private:
 
     // variables
 
-    sensor_msgs::msg::LaserScan scan_msg;
 
     // subscribers
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr tf;
-    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub;    
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub; 
+    
+   
 
     
 
@@ -58,9 +60,7 @@ private:
 
 
     // methods
+    void tf_callback(const tf2_msgs::msg::TFMessage::SharedPtr msg);
+    void path_callback(const nav_msgs::msg::Path::SharedPtr msg);
     
-
-    visualization_msgs::msg::Marker create_marker(double x, double y, double r, double g, double b, double size_factor, int id);
-
-    visualization_msgs::msg::Marker create_line_marker(double x1, double y1, double x2, double y2, double r, double g, double b, double width, int id);
 };

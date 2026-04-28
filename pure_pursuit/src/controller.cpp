@@ -4,8 +4,6 @@
 controller::controller() : Node("controller")
 {
   /* ---- subscribers ---- */
-  scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
-    "/scan", 10, std::bind(&controller::scan_callback, this, std::placeholders::_1));
   tf = this->create_subscription<tf2_msgs::msg::TFMessage>("/tf", 10, std::bind(&controller::tf_callback, this, std::placeholders::_1));
   path_sub = this->create_subscription<nav_msgs::msg::Path>("/global_path", 10, std::bind(&controller::path_callback, this, std::placeholders::_1));
 
@@ -16,12 +14,19 @@ controller::controller() : Node("controller")
   
 
   // publish diagnostics once per second
-  diag_timer = this->create_wall_timer(
-      std::chrono::seconds(1),
-      std::bind(&FollowGap::diag_timer_callback, this));
-
+  
   // variables
 
+}
+
+
+void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
+{
+  RCLCPP_INFO(this->get_logger(), "Received path with %zu poses", msg->poses.size());
+}
+void controller::tf_callback(const tf2_msgs::msg::TFMessage::SharedPtr msg)
+{
+  RCLCPP_INFO(this->get_logger(), "Received TF message with %zu transforms", msg->transforms.size());
 }
 
 int main(int argc, char ** argv)

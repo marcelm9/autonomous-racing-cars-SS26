@@ -16,12 +16,12 @@ find_package(std_srvs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
-find_package(simple_raceline REQUIRED)
+find_package(tf2_msgs REQUIRED)
  
 
 add_executable(controller src/controller.cpp)
 ament_target_dependencies(controller
-  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs" "diagnostic_msgs" "tf2_msgs" "nav_msgs" "simple_raceline"
+  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs" "diagnostic_msgs" "tf2_msgs" "nav_msgs"
 )
 
 install(TARGETS
