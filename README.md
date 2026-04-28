@@ -55,3 +55,9 @@ The config file for the particle filter is located [here](~/racecar_ws/src/arc_r
 8) `ros2 launch particle_filter localize_launch.py`
 
 To have a visualization of the map just run rviz2 with the `/map` topic. To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
+
+# raceline
+First install neccessary python package in your container
+`sudo apt update && sudo apt install python3-skimage`
+To launch run
+`ros2 launch simple_raceline test_launch.py`
