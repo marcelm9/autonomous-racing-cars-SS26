@@ -61,3 +61,15 @@ First install neccessary python package in your container
 `sudo apt update && sudo apt install python3-skimage`
 To launch run
 `ros2 launch simple_raceline test_launch.py`
+
+
+### Use mapserver to show map in rviz
+1) `ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=MAP_FILENAME_PATH-yaml`
+2) in different terminal:
+ `ros2 run nav2_util lifecycle_bringup map_server`
+3) In rviz2 include topic /maps and set topic
+    History Policy: `Keep Last` 
+    Reliability Policy: `Reliable`
+    Durability Policy: `Transiet Local` 
+
+
