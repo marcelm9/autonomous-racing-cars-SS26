@@ -1,10 +1,4 @@
-
-#include <cstdio>
 #include "./../include/pure_pursuit/controller.hpp"
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-#include <geometry_msgs/msg/point_stamped.hpp>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Matrix3x3.h>
 
 controller::controller() : Node("controller")
 {
@@ -27,8 +21,8 @@ controller::controller() : Node("controller")
   );
 
   // TF buffer initilization
-  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
 }
 
@@ -43,15 +37,16 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
 
 void controller::pure_persuit_timer_callback()
 {
-  std::cout << "in timer callback" << std::endl;
-  if (!path_received_) return;
-
+  if (!this->path_received_) {
+    std::cout << "NO PATH RECEIVED, RETURNING" << std::endl;
+    return;
+  }
   geometry_msgs::msg::TransformStamped map_to_base_link;
 
   try {
       // 1. Get the current position of the car in the map
       // Target: map, Source: base_link
-      map_to_base_link = tf_buffer_->lookupTransform(
+      map_to_base_link = this->tf_buffer_->lookupTransform(
           "map", "ego_racecar/base_link", tf2::TimePointZero);
           
   } catch (const tf2::TransformException & ex) {
@@ -77,8 +72,7 @@ void controller::pure_persuit_timer_callback()
   }
   if (closest_index != -1)
   {
-      std::cout << "Closest path point: (" << this->current_path.poses[closest_index].pose.position.x
-                << ", " << this->current_path.poses[closest_index].pose.position.y << ")" << std::endl;
+      //std::cout << "Closest path point: (" << this->current_path.poses[closest_index].pose.position.x << ", " << this->current_path.poses[closest_index].pose.position.y << ")" << std::endl;
   }
 
   float min_diff = std::numeric_limits<float>::infinity();
@@ -90,34 +84,59 @@ void controller::pure_persuit_timer_callback()
       double path_x = path_point.pose.position.x;
       double path_y = path_point.pose.position.y;
       double dist = std::sqrt(std::pow(path_x - car_x, 2) + std::pow(path_y - car_y, 2));
-      if (std::abs(dist - L) < min_diff)
+      if (std::abs(dist - LOOK_AHEAD_DISTANCE) < min_diff)
       {
-          min_diff = std::abs(dist - L);
+          min_diff = std::abs(dist - LOOK_AHEAD_DISTANCE);
           goal_point = path_point;
       }
   }
   
+  // transformation of the goal point in the car coordinate system
+  // goal point in tf notation
   geometry_msgs::msg::PointStamped goal_map_frame;
   goal_map_frame.header.frame_id = "map";
   goal_map_frame.point = goal_point.pose.position;
 
-    geometry_msgs::msg::PointStamped goal_car_frame;
+  geometry_msgs::msg::PointStamped goal_car_frame;
 
-    try {
-        
-        tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
-        
-        
-        double lx = goal_car_frame.point.x; // Distance forward from car
-        double ly = goal_car_frame.point.y; // Distance left/right from car center
-        
-       
-        
-    } catch (const tf2::TransformException & ex) {
-        RCLCPP_ERROR(this->get_logger(), "Goal transform failed: %s", ex.what());
-    }
+
+  double lx = -1;
+  double ly = -1;
+  try
+  {    
+    // transformation
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
+    // extract coordinates
+    lx = goal_car_frame.point.x;  // Distance forward from car
+    ly = goal_car_frame.point.y;  // Distance left/right from car center
+
+  } catch (const tf2::TransformException & ex)
+  {
+    RCLCPP_ERROR(this->get_logger(), "Goal transform failed: %s", ex.what());
+    return;
+  }
   
-    // Calc steering angle using pure pursuit geometry using lx and ly
+
+  // Calc steering angle using pure pursuit geometry using lx and ly
+
+  // (1) calc alpha
+  double alpha = acos( (1*lx)/(1* std::sqrt(std::pow(lx,2) + std::pow(ly,2)) ) );
+
+  // (2) calc steering angle
+  this->steering_angle = atan( (2*WHEELBASE_LENGTH*sin(alpha))/(LOOK_AHEAD_DISTANCE) );
+  this->construct_and_publish_drive_message();
+}
+
+
+void controller::construct_and_publish_drive_message()
+{
+  // construct message
+  ackermann_msgs::msg::AckermannDriveStamped drive_msg;
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
+  drive_msg.drive.speed = CAR_SPEED;
+
+  // publish message
+  this->drive_speed_pub->publish(drive_msg);
 }
 
 

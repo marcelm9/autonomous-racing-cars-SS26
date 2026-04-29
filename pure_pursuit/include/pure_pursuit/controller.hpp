@@ -5,12 +5,12 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iostream>
+#include <math.h>
 #include <limits>
-
 #include <chrono>
+#include <cstdio>
 
 #include "rclcpp/rclcpp.hpp"
-/// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
@@ -29,9 +29,17 @@
 #include "tf2_ros/transform_listener.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
-#pragma once
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 
-// declarations:
+
+// GLOBAL CONSTANTS
+#define WHEELBASE_LENGTH 1.0
+#define LOOK_AHEAD_DISTANCE 1.0
+#define CAR_SPEED 1.0
+
 
 class controller : public rclcpp::Node
 {
@@ -44,7 +52,7 @@ public:
 private:
     // PARAMETERS
 
-    
+    // timer parameters
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     
@@ -54,10 +62,10 @@ private:
     /* ---- Internal State for Diagnostics ---- */
     
 
-    // variables
+    // VARIABLES
     nav_msgs::msg::Path current_path;
     bool path_received_ = false;
-    double L = 1.0;
+    double steering_angle = 0.0;
 
 
     // subscribers
@@ -70,11 +78,11 @@ private:
 
     // methods
     void path_callback(const nav_msgs::msg::Path::SharedPtr msg);
+    void construct_and_publish_drive_message();
 
     // timer
     rclcpp::TimerBase::SharedPtr pure_persuit_timer;
     void pure_persuit_timer_callback();
     
 };
-
 #endif
