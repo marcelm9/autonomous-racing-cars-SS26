@@ -120,10 +120,10 @@ void controller::pure_persuit_timer_callback()
   // Calc steering angle using pure pursuit geometry using lx and ly
 
   // (1) calc alpha
-  double alpha = acos( (1*lx)/(1* std::sqrt(std::pow(lx,2) + std::pow(ly,2)) ) );
+  double alpha = std::atan2(ly, lx);
 
   // (2) calc steering angle
-  this->steering_angle = atan( (2*WHEELBASE_LENGTH*sin(alpha))/(LOOK_AHEAD_DISTANCE) );
+  this->steering_angle = std::atan2( (2*WHEELBASE_LENGTH*sin(alpha)), (LOOK_AHEAD_DISTANCE) );
   this->construct_and_publish_drive_message();
 }
 
@@ -132,7 +132,8 @@ void controller::construct_and_publish_drive_message()
 {
   // construct message
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
+  //drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
+  drive_msg.drive.steering_angle = this->steering_angle;
   drive_msg.drive.speed = CAR_SPEED;
 
   // publish message

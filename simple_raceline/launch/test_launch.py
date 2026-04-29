@@ -42,7 +42,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.append(
         DeclareLaunchArgument(
             name = "safety",
-            default_value = "5",
+            default_value = "12",
             description = (
                 "[-] amount of pixels eroded from the driveable area"
             ),
@@ -62,7 +62,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.append(
         DeclareLaunchArgument(
             name = "closed_loop",
-            default_value = "False",
+            default_value = "True",
             description = (
                 "when True, the path is created as a closed loop"
             ),
@@ -122,6 +122,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # rViz2
+    """
     ld.append(
         Node(
             package = "rviz2",
@@ -138,6 +139,6 @@ def generate_launch_description() -> LaunchDescription:
             on_exit = Shutdown(),
         )
     )
-
+    """
 
     return LaunchDescription(ld)

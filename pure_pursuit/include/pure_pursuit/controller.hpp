@@ -37,8 +37,8 @@
 
 // GLOBAL CONSTANTS
 #define WHEELBASE_LENGTH 1.0
-#define LOOK_AHEAD_DISTANCE 1.0
-#define CAR_SPEED 1.0
+#define LOOK_AHEAD_DISTANCE 2.2
+#define CAR_SPEED 6.0
 
 
 class controller : public rclcpp::Node
