@@ -16,7 +16,7 @@ controller::controller() : Node("controller")
   
   // variables config
   this->declare_parameter<double>("LOOK_AHEAD_DISTANCE", 2.2);
-  this->declare_parameter<double>("CAR_SPEED", 6.0);
+  this->declare_parameter<double>("CAR_SPEED", 1.0);
 
   // timers
   pure_persuit_timer = this->create_wall_timer(
