@@ -45,7 +45,7 @@ def generate_launch_description() -> LaunchDescription:
             name="map_yaml",
             # Provide a fallback default or leave it empty to force user input
             default_value=PathJoinSubstitution([
-                FindPackageShare("simple_raceline"),
+                FindPackageShare("launch_orchestrator"),
                 "maps",
                 "bunch_of_sticks.yaml",
             ]),
@@ -84,7 +84,7 @@ def generate_launch_description() -> LaunchDescription:
             parameters = [
                 {
                     "yaml_filename": PathJoinSubstitution([
-                        FindPackageShare("simple_raceline"),
+                        FindPackageShare("launch_orchestrator"),
                         "maps",
                         "bunch_of_sticks.yaml",
                     ])

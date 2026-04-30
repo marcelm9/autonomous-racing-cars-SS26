@@ -36,12 +36,6 @@ setup(
                 os.path.join("launch", "*launch.[yxpr][amyv]*"),
             ),
         ),
-        (
-            os.path.join("share", package_name, "maps"),
-            glob(
-                os.path.join("maps", "*.[yp][agmn][mg]*"),
-            ),
-        ),
     ],
     install_requires = [
         "setuptools",
