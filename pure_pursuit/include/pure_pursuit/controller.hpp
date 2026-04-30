@@ -38,8 +38,7 @@
 
 
 // GLOBAL CONSTANTS
-#define WHEELBASE_LENGTH 1.0
-#define CAR_SPEED 6.0
+#define WHEELBASE_LENGTH 1.
 
 
 class controller : public rclcpp::Node

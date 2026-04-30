@@ -97,20 +97,20 @@ void controller::pure_persuit_timer_callback()
       {
           min_diff = std::abs(dist - this->get_parameter("LOOK_AHEAD_DISTANCE").as_double());
           goal_point = path_point;
-          auto goal_msg = geometry_msgs::msg::PointStamped();
-
-          goal_msg.header.stamp = this->now();
-          goal_msg.header.frame_id = "map"; // Or "base_link" depending on your math
-
-          // Point data
-          goal_msg.point.x = goal_point.pose.position.x;
-          goal_msg.point.y = goal_point.pose.position.y;
-          goal_msg.point.z = 0.0; 
-
-          goal_pub->publish(goal_msg);
+          
       }
   }
-  
+  auto goal_msg = geometry_msgs::msg::PointStamped();
+
+  goal_msg.header.stamp = this->now();
+  goal_msg.header.frame_id = "map"; // Or "base_link" depending on your math
+
+  // Point data
+  goal_msg.point.x = goal_point.pose.position.x;
+  goal_msg.point.y = goal_point.pose.position.y;
+  goal_msg.point.z = 0.0; 
+
+  goal_pub->publish(goal_msg);
   // transformation of the goal point in the car coordinate system
   // goal point in tf notation
   geometry_msgs::msg::PointStamped goal_map_frame;
