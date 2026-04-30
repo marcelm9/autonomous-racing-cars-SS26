@@ -14,9 +14,10 @@ controller::controller() : Node("controller")
   // publish
   goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
   
-  // variables
+  // variables config
   this->declare_parameter<double>("LOOK_AHEAD_DISTANCE", 2.2);
-  
+  this->declare_parameter<double>("CAR_SPEED", 6.0);
+
   // timers
   pure_persuit_timer = this->create_wall_timer(
     std::chrono::milliseconds(50),
@@ -154,7 +155,7 @@ void controller::construct_and_publish_drive_message()
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
   //drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
   drive_msg.drive.steering_angle = this->steering_angle;
-  drive_msg.drive.speed = CAR_SPEED;
+  drive_msg.drive.speed = this->get_parameter("CAR_SPEED").as_double();
 
   // publish message
   this->drive_speed_pub->publish(drive_msg);
