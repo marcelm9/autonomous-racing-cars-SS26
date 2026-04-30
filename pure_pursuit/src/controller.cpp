@@ -89,6 +89,17 @@ void controller::pure_persuit_timer_callback()
       {
           min_diff = std::abs(dist - LOOK_AHEAD_DISTANCE);
           goal_point = path_point;
+          auto goal_msg = geometry_msgs::msg::PointStamped();
+
+          goal_msg.header.stamp = this->now();
+          goal_msg.header.frame_id = "map"; // Or "base_link" depending on your math
+
+          // Point data
+          goal_msg.point.x = goal_point.pose.position.x;
+          goal_msg.point.y = goal_point.pose.position.y;
+          goal_msg.point.z = 0.0; 
+
+          goal_pub->publish(goal_msg);
       }
   }
   
@@ -111,18 +122,7 @@ void controller::pure_persuit_timer_callback()
     lx = goal_car_frame.point.x;  // Distance forward from car
     ly = goal_car_frame.point.y;  // Distance left/right from car center
 
-    auto goal_msg = geometry_msgs::msg::PointStamped();
-
-    / Header info (CRITICAL for RViz)
-    goal_msg.header.stamp = this->now();
-    goal_msg.header.frame_id = "map"; // Or "base_link" depending on your math
-
-    // Point data
-    goal_msg.point.x = lx;
-    goal_msg.point.y = ly;
-    goal_msg.point.z = 0.0; 
-
-    goal_pub->publish(goal_msg);
+    
   } catch (const tf2::TransformException & ex)
   {
     RCLCPP_ERROR(this->get_logger(), "Goal transform failed: %s", ex.what());
