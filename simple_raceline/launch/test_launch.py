@@ -47,12 +47,12 @@ def generate_launch_description() -> LaunchDescription:
             default_value=PathJoinSubstitution([
                 FindPackageShare("launch_orchestrator"),
                 "maps",
-                "bunch_of_sticks.yaml",
+                "crazy_map.yaml",
             ]),
             description="Full path to the SLAM-generated map yaml file"
         )
     )
-    ld.append(DeclareLaunchArgument(name="safety", default_value="12"))
+    ld.append(DeclareLaunchArgument(name="safety", default_value="5"))
 
     ld.append(
         DeclareLaunchArgument(
@@ -86,7 +86,7 @@ def generate_launch_description() -> LaunchDescription:
                     "yaml_filename": PathJoinSubstitution([
                         FindPackageShare("launch_orchestrator"),
                         "maps",
-                        "bunch_of_sticks.yaml",
+                        "crazy_map.yaml",
                     ])
                 },
             ],
@@ -127,7 +127,7 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # rViz2
-    """
+    
     ld.append(
         Node(
             package = "rviz2",
@@ -144,6 +144,6 @@ def generate_launch_description() -> LaunchDescription:
             on_exit = Shutdown(),
         )
     )
-    """
+    
 
     return LaunchDescription(ld)
