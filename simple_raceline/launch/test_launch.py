@@ -47,12 +47,12 @@ def generate_launch_description() -> LaunchDescription:
             default_value=PathJoinSubstitution([
                 FindPackageShare("launch_orchestrator"),
                 "maps",
-                "bunch_of_sticks.yaml",
+                "crazy_map.yaml",
             ]),
             description="Full path to the SLAM-generated map yaml file"
         )
     )
-    ld.append(DeclareLaunchArgument(name="safety", default_value="7"))
+    ld.append(DeclareLaunchArgument(name="safety", default_value="5"))
 
     ld.append(
         DeclareLaunchArgument(
