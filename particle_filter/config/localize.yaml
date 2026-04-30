@@ -32,5 +32,5 @@ particle_filter:
 
 map_server:
   ros__parameters:
-    # assuming map file is in particle_filter/maps
+    # assuming map file is in arc_riders/launch_orchestrator/maps
     map: 'MAP_NAME_HERE'
