@@ -107,7 +107,7 @@ def generate_launch_description() -> LaunchDescription:
         )
     )
 
-    # Simple raceline node
+    # SimpleRaceline Node
     ld.append(
         Node(
             package = "simple_raceline",
@@ -121,6 +121,17 @@ def generate_launch_description() -> LaunchDescription:
                 },
             ],
         )
+    )
+    
+    # Particle Filter Node
+    ld.append(
+        Node(
+            package='particle_filter',
+            executable='particle_filter',
+            name='particle_filter',
+            parameters=[LaunchConfiguration('localize_config')]
+        )
+        
     )
     
     # PurePersuite Node
