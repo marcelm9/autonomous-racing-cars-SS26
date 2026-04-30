@@ -1,34 +1,21 @@
 #!/usr/bin/env python3
 # create_raceline_and_start_pure_persuit_launch.py
-"""Launch file for demonstrating and testing the simple_raceline.
 
-Source:
-https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Launch-system.html
-https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-Substitutions.html
-"""
 
-from launch import (
-    LaunchDescription,
-)
+import os
+import yaml
 
-from launch.actions import (
-    DeclareLaunchArgument,
-    Shutdown,
-)
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
-from launch.substitutions import (
-    LaunchConfiguration,
-    PathJoinSubstitution,
-)
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 
-from launch_ros.actions import (
-    Node,
-)
+from ament_index_python.packages import get_package_share_directory
 
-from launch_ros.substitutions import (
-    FindPackageShare,
-)
-
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description() -> LaunchDescription:
     """Entry point function called by ros2 launch."""
@@ -42,7 +29,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.append(
         DeclareLaunchArgument(
             name = "safety",
-            default_value = "12",
+            default_value = "7",
             description = (
                 "[-] amount of pixels eroded from the driveable area"
             ),
@@ -71,7 +58,7 @@ def generate_launch_description() -> LaunchDescription:
 
 
     # --- NODES --- #
-    
+
     # Map server
     ld.append(
         Node(
@@ -124,14 +111,21 @@ def generate_launch_description() -> LaunchDescription:
     )
     
     # Particle Filter Node
+
+    localize_config = os.path.join(
+        get_package_share_directory('particle_filter'),
+        'config',
+        'localize.yaml'
+    )
+
     ld.append(
         Node(
-            package='particle_filter',
-            executable='particle_filter',
-            name='particle_filter',
-            parameters=[LaunchConfiguration('localize_config')]
+            package="particle_filter",
+            executable="particle_filter",
+            name="particle_filter",
+            parameters=[localize_config],
+            output="screen",
         )
-        
     )
     
     # PurePersuite Node
@@ -145,6 +139,19 @@ def generate_launch_description() -> LaunchDescription:
         )
     )
 
+
+    # --- OTHER LAUNCH FILES --- #
+
+    # Bringup Launch
+    pkg_path = get_package_share_directory('f1tenth_stack')
+    launch_file = 'bringup_launch.py'
+    ld.append(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_path, 'launch', launch_file)
+            )
+        )
+    )
 
 
     return LaunchDescription(ld)
