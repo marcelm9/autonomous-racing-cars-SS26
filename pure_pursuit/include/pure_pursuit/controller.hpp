@@ -67,7 +67,9 @@ private:
     // VARIABLES
     nav_msgs::msg::Path current_path;
     bool path_received_ = false;
-    double steering_angle = 0.0;
+    double current_velocity = 0.0; // Tracks the current speed of the car
+    double target_velocity = 0.0;  // The calculated speed for the next command
+    double steering_angle = 0.0;   // The calculated steering angle
 
 
     // subscribers

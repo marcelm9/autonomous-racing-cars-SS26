@@ -17,6 +17,9 @@ controller::controller() : Node("controller")
   // variables config
   this->declare_parameter<double>("LOOK_AHEAD_DISTANCE", 1.3);
   this->declare_parameter<double>("CAR_SPEED", 3.0);
+  this->current_velocity = 0.0;
+  this->target_velocity = 0.0;
+  this->steering_angle = 0.0;
 
   // timers
   pure_persuit_timer = this->create_wall_timer(
@@ -47,115 +50,103 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
 void controller::pure_persuit_timer_callback()
 {
   if (!this->path_received_) {
-    std::cout << "NO PATH RECEIVED, RETURNING" << std::endl;
     return;
   }
   
+  // --- DYNAMIC PARAMETERS (Hardcoded logic instead of get_parameter) ---
+  const double K_L = 0.32;        // Lookahead gain (seconds). Increase for more stability.
+  const double MIN_L = 0.8;       // Minimum lookahead distance (meters)
+  const double MAX_L = 4.5;       // Maximum lookahead distance (meters)
+  const double MAX_V = 7.0;       // Top speed on straights (m/s)
+  const double MIN_V = 3.0;       // Minimum speed in sharp turns (m/s)
+  const double MAX_STEER = 0.418; // Max steering limit (approx 24 degrees)
+  // ---------------------------------------------------------------------
+
   geometry_msgs::msg::TransformStamped map_to_base_link;
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
           "map", "ego_racecar/base_link", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform map to base_link: %s", ex.what());
       return;
   }
 
   double car_x = map_to_base_link.transform.translation.x;
   double car_y = map_to_base_link.transform.translation.y;
 
-  // 1. Find closest point (unchanged)
+  // 1. Calculate Dynamic Lookahead based on current speed
+  // Note: Using the last commanded speed or odom speed if available
+  double dynamic_lookahead = std::clamp(this->current_velocity * K_L, MIN_L, MAX_L);
+
+  // 2. Find closest point (Modulo Wrap-around)
   float min_dist = std::numeric_limits<float>::infinity();
   int closest_index = -1;
   size_t path_size = this->current_path.poses.size();
 
-  for (size_t i = 0; i < path_size; ++i)
-  {
-      double path_x = this->current_path.poses[i].pose.position.x;
-      double path_y = this->current_path.poses[i].pose.position.y;
-      // std::hypot is a cleaner/faster way to write sqrt(a^2 + b^2)
-      double dist = std::hypot(path_x - car_x, path_y - car_y); 
-      
-      if (dist < min_dist)
-      {
+  for (size_t i = 0; i < path_size; ++i) {
+      double dist = std::hypot(this->current_path.poses[i].pose.position.x - car_x, 
+                               this->current_path.poses[i].pose.position.y - car_y); 
+      if (dist < min_dist) {
           min_dist = dist;
           closest_index = i;
       }
   }
+  if (closest_index == -1) return;
 
-  if (closest_index == -1) return; // Safety check
-
-  // 2. Find goal point using wrap-around (Modulo Arithmetic)
-  double lookahead = this->get_parameter("LOOK_AHEAD_DISTANCE").as_double();
-  
-  // Default to closest point in case we somehow don't find a lookahead point
+  // 3. Find goal point using wrap-around
   geometry_msgs::msg::PoseStamped goal_point = this->current_path.poses[closest_index]; 
-
-  // Iterate forward along the path starting from the closest index.
-  // We check up to 'path_size' to ensure we don't enter an infinite loop.
-  for (size_t i = 0; i < path_size; ++i)
-  {
-      // THE FIX: Modulo operator wraps the index back to 0 if it exceeds the path size.
-      size_t idx = (closest_index + i) % path_size; 
-      
+  for (size_t i = 0; i < path_size; ++i) {
+      size_t idx = (closest_index + i) % path_size; // MODULO FIX
       const auto & path_point = this->current_path.poses[idx];
-      double path_x = path_point.pose.position.x;
-      double path_y = path_point.pose.position.y;
-      double dist = std::hypot(path_x - car_x, path_y - car_y);
+      double dist = std::hypot(path_point.pose.position.x - car_x, 
+                               path_point.pose.position.y - car_y);
 
-      // Instead of checking for min_diff, standard Pure Pursuit stops at the 
-      // FIRST point that is further away than your lookahead distance.
-      // This prevents the car from accidentally locking onto track sections 
-      // on the other side of a hairpin!
-      if (dist >= lookahead)
-      {
+      if (dist >= dynamic_lookahead) {
           goal_point = path_point;
-          break; // We found our target, stop searching
+          break; 
       }
   }
 
-  // 3. Publish and transform the goal point
-  auto goal_msg = geometry_msgs::msg::PointStamped();
-  goal_msg.header.stamp = this->now();
-  goal_msg.header.frame_id = "map"; 
-  goal_msg.point.x = goal_point.pose.position.x;
-  goal_msg.point.y = goal_point.pose.position.y;
-  goal_msg.point.z = 0.0; 
-  goal_pub->publish(goal_msg);
-
-  geometry_msgs::msg::PointStamped goal_map_frame;
+  // 4. Transform goal point to car frame
+  geometry_msgs::msg::PointStamped goal_map_frame, goal_car_frame;
   goal_map_frame.header.frame_id = "map";
   goal_map_frame.point = goal_point.pose.position;
-  geometry_msgs::msg::PointStamped goal_car_frame;
 
-  double lx = -1;
-  double ly = -1;
-  try
-  {    
+  try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
-    lx = goal_car_frame.point.x;  
-    ly = goal_car_frame.point.y;  
-  } catch (const tf2::TransformException & ex)
-  {
-    RCLCPP_ERROR(this->get_logger(), "Goal transform failed: %s", ex.what());
+  } catch (const tf2::TransformException & ex) {
     return;
   }
 
-  // 4. Calculate steering
+  double lx = goal_car_frame.point.x;  
+  double ly = goal_car_frame.point.y;  
+
+  // 5. Calculate steering angle
   double alpha = std::atan2(ly, lx);
-  this->steering_angle = std::atan2( (2 * WHEELBASE_LENGTH * sin(alpha)), lookahead );
+  this->steering_angle = std::atan2((2 * WHEELBASE_LENGTH * std::sin(alpha)), dynamic_lookahead);
+
+  // 6. Set Dynamic Velocity based on Steering Angle
+  // Higher steering angle = lower velocity
+  double steer_ratio = std::abs(this->steering_angle) / MAX_STEER;
+  steer_ratio = std::clamp(steer_ratio, 0.0, 1.0);
+  
+  // Linear interpolation: if steer is 0, speed is MAX_V. If steer is MAX, speed is MIN_V.
+  this->target_velocity = MAX_V - (steer_ratio * (MAX_V - MIN_V));
+
   this->construct_and_publish_drive_message();
 }
 
-
 void controller::construct_and_publish_drive_message()
 {
-  // construct message
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
-  //drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
-  drive_msg.drive.steering_angle = this->steering_angle;
-  drive_msg.drive.speed = this->get_parameter("CAR_SPEED").as_double();
+  drive_msg.header.stamp = this->now();
+  drive_msg.header.frame_id = "base_link";
+  
+  drive_msg.drive.steering_angle = static_cast<float>(this->steering_angle);
+  drive_msg.drive.speed = static_cast<float>(this->target_velocity);
 
-  // publish message
+  // Update current_velocity for the next iteration's lookahead calculation
+  this->current_velocity = this->target_velocity;
+
   this->drive_speed_pub->publish(drive_msg);
 }
 
