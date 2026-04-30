@@ -35,19 +35,24 @@ def generate_launch_description() -> LaunchDescription:
     safety = LaunchConfiguration("safety")
     sparse = LaunchConfiguration("sparse")
     closed_loop = LaunchConfiguration("closed_loop")
-
+    map_yaml = LaunchConfiguration("map_yaml")
+    
     ld = []
 
     # Arguments
     ld.append(
         DeclareLaunchArgument(
-            name = "safety",
-            default_value = "12",
-            description = (
-                "[-] amount of pixels eroded from the driveable area"
-            ),
+            name="map_yaml",
+            # Provide a fallback default or leave it empty to force user input
+            default_value=PathJoinSubstitution([
+                FindPackageShare("simple_raceline"),
+                "maps",
+                "bunch_of_sticks.yaml",
+            ]),
+            description="Full path to the SLAM-generated map yaml file"
         )
     )
+    ld.append(DeclareLaunchArgument(name="safety", default_value="12"))
 
     ld.append(
         DeclareLaunchArgument(

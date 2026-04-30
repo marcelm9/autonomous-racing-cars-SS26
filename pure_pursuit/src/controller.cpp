@@ -7,18 +7,27 @@ controller::controller() : Node("controller")
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
+  diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
 
   std::cout << "in constructor" << std::endl;  
 
-  // publish diagnostics once per second
+  // publish
+  goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
   
-  // variables
+  // variables config
+  this->declare_parameter<double>("LOOK_AHEAD_DISTANCE", 2.2);
+  this->declare_parameter<double>("CAR_SPEED", 6.0);
 
   // timers
   pure_persuit_timer = this->create_wall_timer(
     std::chrono::milliseconds(50),
     std::bind(&controller::pure_persuit_timer_callback, this)
   );
+
+  /* diagnostics_timer = this->create_wall_timer(
+    std::chrono::milliseconds(1000), 
+    std::bind(&controller::diagnostics_timer_callback, this)
+  ); */
 
   // TF buffer initilization
   this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -84,10 +93,21 @@ void controller::pure_persuit_timer_callback()
       double path_x = path_point.pose.position.x;
       double path_y = path_point.pose.position.y;
       double dist = std::sqrt(std::pow(path_x - car_x, 2) + std::pow(path_y - car_y, 2));
-      if (std::abs(dist - LOOK_AHEAD_DISTANCE) < min_diff)
+      if (std::abs(dist - this->get_parameter("LOOK_AHEAD_DISTANCE").as_double()) < min_diff)
       {
-          min_diff = std::abs(dist - LOOK_AHEAD_DISTANCE);
+          min_diff = std::abs(dist - this->get_parameter("LOOK_AHEAD_DISTANCE").as_double());
           goal_point = path_point;
+          auto goal_msg = geometry_msgs::msg::PointStamped();
+
+          goal_msg.header.stamp = this->now();
+          goal_msg.header.frame_id = "map"; // Or "base_link" depending on your math
+
+          // Point data
+          goal_msg.point.x = goal_point.pose.position.x;
+          goal_msg.point.y = goal_point.pose.position.y;
+          goal_msg.point.z = 0.0; 
+
+          goal_pub->publish(goal_msg);
       }
   }
   
@@ -110,6 +130,7 @@ void controller::pure_persuit_timer_callback()
     lx = goal_car_frame.point.x;  // Distance forward from car
     ly = goal_car_frame.point.y;  // Distance left/right from car center
 
+    
   } catch (const tf2::TransformException & ex)
   {
     RCLCPP_ERROR(this->get_logger(), "Goal transform failed: %s", ex.what());
@@ -123,7 +144,7 @@ void controller::pure_persuit_timer_callback()
   double alpha = std::atan2(ly, lx);
 
   // (2) calc steering angle
-  this->steering_angle = std::atan2( (2*WHEELBASE_LENGTH*sin(alpha)), (LOOK_AHEAD_DISTANCE) );
+  this->steering_angle = std::atan2( (2*WHEELBASE_LENGTH*sin(alpha)), (this->get_parameter("LOOK_AHEAD_DISTANCE").as_double()));
   this->construct_and_publish_drive_message();
 }
 
@@ -134,10 +155,31 @@ void controller::construct_and_publish_drive_message()
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
   //drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->steering_angle), -0.2f, 0.2f);
   drive_msg.drive.steering_angle = this->steering_angle;
-  drive_msg.drive.speed = CAR_SPEED;
+  drive_msg.drive.speed = this->get_parameter("CAR_SPEED").as_double();
 
   // publish message
   this->drive_speed_pub->publish(drive_msg);
+}
+
+
+void controller::diagnostics_timer_callback()
+{
+    diagnostic_msgs::msg::DiagnosticArray array_msg;
+    array_msg.header.stamp = this->now();
+
+    diagnostic_msgs::msg::DiagnosticStatus status_msg;
+    status_msg.name = "safety_node";
+    status_msg.hardware_id = "f1tenth_car";
+
+
+    status_msg.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
+    status_msg.message = "Not used";
+    
+
+    array_msg.status.push_back(status_msg);
+
+    diagnostics_pub->publish(array_msg);
+    std::cout << "successfull ended callback" << std::endl;
 }
 
 

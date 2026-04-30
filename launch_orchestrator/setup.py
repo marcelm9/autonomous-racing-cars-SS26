@@ -20,7 +20,9 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yma]*'))),
         # Include all config files (like your yaml)
         (os.path.join('share', package_name, 'config'), glob(os.path.join('config', '*.yaml'))),
-        
+
+        # Include all map files
+        (os.path.join('share', package_name, 'maps'), glob(os.path.join('maps', '*'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

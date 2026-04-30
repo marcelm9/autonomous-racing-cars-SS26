@@ -6,7 +6,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # 1. Path to the simulator launch file
     pkg_path = get_package_share_directory('f1tenth_stack')
     launch_file = 'bringup_launch.py'
     basic_launch = IncludeLaunchDescription(
@@ -15,9 +14,6 @@ def generate_launch_description():
         )
     )
 
-    # 2. Your Reactive Node
-    # Note: Topic names in the simulator are usually /scan and /ego_racecar/odom.
-    # If your code uses different names, use the 'remappings' argument below.
     reactive = Node(
         package='reactive',
         executable='reactive',

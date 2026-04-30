@@ -29,6 +29,8 @@
 #include "tf2_ros/transform_listener.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "geometry_msgs/msg/point_stamped.hpp"
+
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -37,7 +39,6 @@
 
 // GLOBAL CONSTANTS
 #define WHEELBASE_LENGTH 1.0
-#define LOOK_AHEAD_DISTANCE 2.2
 #define CAR_SPEED 6.0
 
 
@@ -60,6 +61,8 @@ private:
     
 
     /* ---- Internal State for Diagnostics ---- */
+
+    
     
 
     // VARIABLES
@@ -73,7 +76,9 @@ private:
     
 
     // publishers
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
+    rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub;
 
 
     // methods
@@ -83,6 +88,9 @@ private:
     // timer
     rclcpp::TimerBase::SharedPtr pure_persuit_timer;
     void pure_persuit_timer_callback();
+
+    rclcpp::TimerBase::SharedPtr diagnostics_timer;
+    void diagnostics_timer_callback();
     
 };
 #endif
