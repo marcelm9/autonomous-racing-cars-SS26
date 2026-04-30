@@ -29,6 +29,8 @@
 #include "tf2_ros/transform_listener.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
+#include "geometry_msgs/msg/point_stamped.hpp"
+
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -73,6 +75,7 @@ private:
     
 
     // publishers
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
 
 
