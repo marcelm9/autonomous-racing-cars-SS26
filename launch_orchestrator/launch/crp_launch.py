@@ -39,7 +39,7 @@ def generate_launch_description() -> LaunchDescription:
     ld.append(
         DeclareLaunchArgument(
             name = "sparse",
-            default_value = "5",
+            default_value = "1",
             description = (
                 "[-] 1 / sampling ratio for the final raceline"
             ),

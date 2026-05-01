@@ -52,6 +52,8 @@ void controller::pure_persuit_timer_callback()
   if (!this->path_received_) {
     return;
   }
+
+  std::cout << "path frame header: " << this->current_path.header.frame_id << std::endl;
   
   // --- DYNAMIC PARAMETERS (Hardcoded logic instead of get_parameter) ---
   const double K_L = 0.32;        // Lookahead gain (seconds). Increase for more stability.
