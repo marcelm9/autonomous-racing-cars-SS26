@@ -8,11 +8,9 @@ controller::controller() : Node("controller")
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
   diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
-
-  std::cout << "in constructor" << std::endl;  
-
-  // publish
   goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
+  nearest_point_on_raceline_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/nearest_point_on_raceline", 10);
+
   
   // variables config
   this->declare_parameter<double>("LOOK_AHEAD_DISTANCE", 1.3);
@@ -57,11 +55,11 @@ void controller::pure_persuit_timer_callback()
   
   // --- DYNAMIC PARAMETERS (Hardcoded logic instead of get_parameter) ---
   const double K_L = 0.32;        // Lookahead gain (seconds). Increase for more stability.
-  const double MIN_L = 0.8;       // Minimum lookahead distance (meters)
-  const double MAX_L = 4.5;       // Maximum lookahead distance (meters)
-  const double MAX_V = 7.0;       // Top speed on straights (m/s)
-  const double MIN_V = 3.0;       // Minimum speed in sharp turns (m/s)
-  const double MAX_STEER = 0.418; // Max steering limit (approx 24 degrees)
+  const double MIN_L = 0.1;       // Minimum lookahead distance (meters)
+  const double MAX_L = 0.3;       // Maximum lookahead distance (meters)
+  const double MAX_V = 1.0;       // Top speed on straights (m/s)
+  const double MIN_V = 1.0;       // Minimum speed in sharp turns (m/s)
+  const double MAX_STEER = 0.218; // Max steering limit (approx 24 degrees)
   // ---------------------------------------------------------------------
 
   geometry_msgs::msg::TransformStamped map_to_base_link;
@@ -113,6 +111,10 @@ void controller::pure_persuit_timer_callback()
   goal_map_frame.header.frame_id = "map";
   goal_map_frame.point = goal_point.pose.position;
 
+  geometry_msgs::msg::PointStamped nearest_point_on_raceline;;
+  nearest_point_on_raceline.header.frame_id = "map";
+  nearest_point_on_raceline.point = this->current_path.poses[closest_index].pose.position;
+
   try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
   } catch (const tf2::TransformException & ex) {
@@ -135,6 +137,7 @@ void controller::pure_persuit_timer_callback()
   this->target_velocity = MAX_V - (steer_ratio * (MAX_V - MIN_V));
 
   goal_pub->publish(goal_map_frame);
+  nearest_point_on_raceline_pub->publish(nearest_point_on_raceline);
 
   this->construct_and_publish_drive_message();
 }
