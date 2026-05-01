@@ -36,8 +36,6 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 
-#include "geometry_msgs/msg/pose_array.hpp"
-
 // GLOBAL CONSTANTS
 #define WHEELBASE_LENGTH 0.33
 
@@ -80,9 +78,9 @@ private:
     // publishers
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_point_on_raceline_pub;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr car_pub;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub;
-    rclcpp::Publisher<geometry_msgs::msg::PoseArray>::SharedPtr raceline_points_pub;
 
 
     // methods

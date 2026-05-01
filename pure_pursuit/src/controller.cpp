@@ -10,7 +10,7 @@ controller::controller() : Node("controller")
   diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
   goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
   nearest_point_on_raceline_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/nearest_point_on_raceline", 10);
-  raceline_points_pub = this->create_publisher<geometry_msgs::msg::PoseArray>("/raceline_points", 10);
+  car_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/car_pos", 10);
 
   
   // variables config
@@ -112,9 +112,16 @@ void controller::pure_persuit_timer_callback()
   goal_map_frame.header.frame_id = "map";
   goal_map_frame.point = goal_point.pose.position;
 
-  geometry_msgs::msg::PointStamped nearest_point_on_raceline;;
+  geometry_msgs::msg::PointStamped nearest_point_on_raceline;
   nearest_point_on_raceline.header.frame_id = "map";
   nearest_point_on_raceline.point = this->current_path.poses[closest_index].pose.position;
+
+  geometry_msgs::msg::PointStamped car_pos;
+  car_pos.header.frame_id = "map";
+  car_pos.header.stamp = this->get_clock()->now(); // Best practice: include a timestamp
+  car_pos.point.x = car_x;
+  car_pos.point.y = car_y;
+  car_pos.point.z = 0.0; // Point fields must be initialized
 
   try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
@@ -139,21 +146,9 @@ void controller::pure_persuit_timer_callback()
 
   goal_pub->publish(goal_map_frame);
   nearest_point_on_raceline_pub->publish(nearest_point_on_raceline);
+  car_pub->publish(car_pos);
 
   this->construct_and_publish_drive_message();
-
-
-  // Publish all raceline points as individual poses
-  geometry_msgs::msg::PoseArray raceline_msg;
-  raceline_msg.header.stamp    = this->now();
-  raceline_msg.header.frame_id = msg->header.frame_id.empty() ? "map" : msg->header.frame_id;
-
-  raceline_msg.poses.reserve(msg->poses.size());
-  for (const auto & stamped_pose : msg->poses) {
-    raceline_msg.poses.push_back(stamped_pose.pose);
-  }
-
-  this->raceline_points_pub->publish(raceline_msg);
 }
 
 void controller::construct_and_publish_drive_message()
