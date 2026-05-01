@@ -147,6 +147,8 @@ void controller::construct_and_publish_drive_message()
   // Update current_velocity for the next iteration's lookahead calculation
   this->current_velocity = this->target_velocity;
 
+  goal_pub->publish(goal_map_frame);
+
   this->drive_speed_pub->publish(drive_msg);
 }
 
