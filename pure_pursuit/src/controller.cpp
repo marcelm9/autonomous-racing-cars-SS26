@@ -10,6 +10,7 @@ controller::controller() : Node("controller")
   diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
   goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
   nearest_point_on_raceline_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/nearest_point_on_raceline", 10);
+  car_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/car_pos", 10);
 
   
   // variables config
@@ -48,11 +49,10 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
 void controller::pure_persuit_timer_callback()
 {
   if (!this->path_received_) {
+    RCLCPP_INFO(this->get_logger(), "No path received");
     return;
   }
 
-  std::cout << "path frame header: " << this->current_path.header.frame_id << std::endl;
-  
   // --- DYNAMIC PARAMETERS (Hardcoded logic instead of get_parameter) ---
   const double K_L = 0.32;        // Lookahead gain (seconds). Increase for more stability.
   const double MIN_L = 0.1;       // Minimum lookahead distance (meters)
@@ -67,6 +67,7 @@ void controller::pure_persuit_timer_callback()
       map_to_base_link = this->tf_buffer_->lookupTransform(
           "map", "particle_filter_base_frame", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "ego_racecar/base_link", ex.what());
       return;
   }
 
@@ -90,8 +91,10 @@ void controller::pure_persuit_timer_callback()
           closest_index = i;
       }
   }
-  if (closest_index == -1) return;
-
+  if (closest_index == -1) {
+      RCLCPP_INFO(this->get_logger(), "Could not find closest point on path");
+      return;
+  } 
   // 3. Find goal point using wrap-around
   geometry_msgs::msg::PoseStamped goal_point = this->current_path.poses[closest_index]; 
   for (size_t i = 0; i < path_size; ++i) {
@@ -111,13 +114,21 @@ void controller::pure_persuit_timer_callback()
   goal_map_frame.header.frame_id = "map";
   goal_map_frame.point = goal_point.pose.position;
 
-  geometry_msgs::msg::PointStamped nearest_point_on_raceline;;
+  geometry_msgs::msg::PointStamped nearest_point_on_raceline;
   nearest_point_on_raceline.header.frame_id = "map";
   nearest_point_on_raceline.point = this->current_path.poses[closest_index].pose.position;
+
+  geometry_msgs::msg::PointStamped car_pos;
+  car_pos.header.frame_id = "map";
+  car_pos.header.stamp = this->get_clock()->now(); // Best practice: include a timestamp
+  car_pos.point.x = car_x;
+  car_pos.point.y = car_y;
+  car_pos.point.z = 0.0; // Point fields must be initialized
 
   try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "particle_filter_base_frame");
   } catch (const tf2::TransformException & ex) {
+    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'ego_racecar/base_link': %s", ex.what());
     return;
   }
 
@@ -138,6 +149,7 @@ void controller::pure_persuit_timer_callback()
 
   goal_pub->publish(goal_map_frame);
   nearest_point_on_raceline_pub->publish(nearest_point_on_raceline);
+  car_pub->publish(car_pos);
 
   this->construct_and_publish_drive_message();
 }
