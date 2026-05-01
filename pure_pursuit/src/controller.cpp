@@ -49,11 +49,10 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
 void controller::pure_persuit_timer_callback()
 {
   if (!this->path_received_) {
+    RCLCPP_INFO(this->get_logger(), "No path received");
     return;
   }
 
-  std::cout << "path frame header: " << this->current_path.header.frame_id << std::endl;
-  
   // --- DYNAMIC PARAMETERS (Hardcoded logic instead of get_parameter) ---
   const double K_L = 0.32;        // Lookahead gain (seconds). Increase for more stability.
   const double MIN_L = 0.1;       // Minimum lookahead distance (meters)
@@ -68,6 +67,7 @@ void controller::pure_persuit_timer_callback()
       map_to_base_link = this->tf_buffer_->lookupTransform(
           "map", "ego_racecar/base_link", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "ego_racecar/base_link", ex.what());
       return;
   }
 
@@ -91,8 +91,10 @@ void controller::pure_persuit_timer_callback()
           closest_index = i;
       }
   }
-  if (closest_index == -1) return;
-
+  if (closest_index == -1) {
+      RCLCPP_INFO(this->get_logger(), "Could not find closest point on path");
+      return;
+  } 
   // 3. Find goal point using wrap-around
   geometry_msgs::msg::PoseStamped goal_point = this->current_path.poses[closest_index]; 
   for (size_t i = 0; i < path_size; ++i) {
@@ -126,6 +128,7 @@ void controller::pure_persuit_timer_callback()
   try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
   } catch (const tf2::TransformException & ex) {
+    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'ego_racecar/base_link': %s", ex.what());
     return;
   }
 
