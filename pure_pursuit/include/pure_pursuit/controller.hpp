@@ -78,6 +78,7 @@ private:
 
     // publishers
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_point_on_raceline;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub;
 
