@@ -44,18 +44,6 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
 
   this->current_path = *msg;
   this->path_received_ = true;
-
-  // Publish all raceline points as individual poses
-  geometry_msgs::msg::PoseArray raceline_msg;
-  raceline_msg.header.stamp    = this->now();
-  raceline_msg.header.frame_id = msg->header.frame_id.empty() ? "map" : msg->header.frame_id;
-
-  raceline_msg.poses.reserve(msg->poses.size());
-  for (const auto & stamped_pose : msg->poses) {
-    raceline_msg.poses.push_back(stamped_pose.pose);
-  }
-
-  this->raceline_points_pub->publish(raceline_msg);
 }
 
 void controller::pure_persuit_timer_callback()
@@ -153,6 +141,19 @@ void controller::pure_persuit_timer_callback()
   nearest_point_on_raceline_pub->publish(nearest_point_on_raceline);
 
   this->construct_and_publish_drive_message();
+
+
+  // Publish all raceline points as individual poses
+  geometry_msgs::msg::PoseArray raceline_msg;
+  raceline_msg.header.stamp    = this->now();
+  raceline_msg.header.frame_id = msg->header.frame_id.empty() ? "map" : msg->header.frame_id;
+
+  raceline_msg.poses.reserve(msg->poses.size());
+  for (const auto & stamped_pose : msg->poses) {
+    raceline_msg.poses.push_back(stamped_pose.pose);
+  }
+
+  this->raceline_points_pub->publish(raceline_msg);
 }
 
 void controller::construct_and_publish_drive_message()
