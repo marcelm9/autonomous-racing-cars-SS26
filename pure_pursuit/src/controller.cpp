@@ -65,7 +65,7 @@ void controller::pure_persuit_timer_callback()
   geometry_msgs::msg::TransformStamped map_to_base_link;
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "ego_racecar/base_link", tf2::TimePointZero);
+          "map", "particle_filter_base_frame", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
       return;
   }
@@ -116,7 +116,7 @@ void controller::pure_persuit_timer_callback()
   nearest_point_on_raceline.point = this->current_path.poses[closest_index].pose.position;
 
   try {    
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, "particle_filter_base_frame");
   } catch (const tf2::TransformException & ex) {
     return;
   }
