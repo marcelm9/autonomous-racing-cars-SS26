@@ -132,6 +132,8 @@ void controller::pure_persuit_timer_callback()
   // Linear interpolation: if steer is 0, speed is MAX_V. If steer is MAX, speed is MIN_V.
   this->target_velocity = MAX_V - (steer_ratio * (MAX_V - MIN_V));
 
+  goal_pub->publish(goal_map_frame);
+
   this->construct_and_publish_drive_message();
 }
 
@@ -146,8 +148,6 @@ void controller::construct_and_publish_drive_message()
 
   // Update current_velocity for the next iteration's lookahead calculation
   this->current_velocity = this->target_velocity;
-
-  goal_pub->publish(goal_map_frame);
 
   this->drive_speed_pub->publish(drive_msg);
 }
