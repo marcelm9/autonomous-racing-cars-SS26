@@ -10,8 +10,18 @@ particle_filter:
     # visualization
     viz: 1
     max_viz_particles: 60
+    
     # ray marching method
     range_method: 'rm'
+
+    # Method | Init time (sec) | Random Queries/Sec | Grid Queries/Sec | Memory (MB)
+    # BL     | 0.02            | 297,000            | 360,000          | 1.37
+    # RM     | 0.59            | 1,170,000          | 1,600,000        | 5.49
+    # RMGPU  | 0.68            | 18,000,000         | 28,000,000       | 5.49
+    # CDDT   | 0.25            | 2,090,000          | 4,250,000        | 6.34
+    # PCDDT  | 7.96            | 2,260,000          | 4,470,000        | 4.07
+    # LUT    | 64.5            | 2,160,000          | 4,850,000        | 296.6
+
     theta_discretization: 112
     # range data filtering
     max_range: 10
