@@ -185,7 +185,7 @@ class RacelineNode(Node):
         # 3. Publish the resulting path
         p = Path()
         p.header.frame_id = "map"
-        for r, c in sparse_path[::-1]:
+        for r, c in reversed(sparse_path):
             p.poses.append(
                 PoseStamped(
                     pose=Pose(
