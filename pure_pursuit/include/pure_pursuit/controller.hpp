@@ -79,7 +79,7 @@ private:
     double current_velocity = 0.0; // Tracks the current speed of the car
     double target_velocity = 0.0;  // The calculated speed for the next command
     double steering_angle = 0.0;   // The calculated steering angle
-
+    const char* base_frame = "ego_racecar/base_link"; // particle_filter_base_frame or ego_racecar/base_link depending on TF tree
 
     // subscribers
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub; 

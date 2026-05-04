@@ -20,7 +20,7 @@ controller::controller() : Node("controller")
   this->steering_angle = 0.0;
     // for steering angle based dynamic lookahead
   this->declare_parameter<double>("K_L", 0.32); // Lookahead gain (seconds). Increase for more stability.
-  this->declare_parameter<double>("MIN_L", 0.5); // Minimum lookahead distance (meters)
+  this->declare_parameter<double>("MIN_L", 0.2); // Minimum lookahead distance (meters)
   this->declare_parameter<double>("MAX_L", 3); // Maximum lookahead distance (meters)
   this->declare_parameter<double>("MAX_V", 10.0); // Top speed on straights (m/s)
   this->declare_parameter<double>("MIN_V", 1.0); // Minimum speed in sharp turns (m/s)
@@ -74,9 +74,9 @@ void controller::pure_pursuit_timer_callback()
 
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "particle_filter_base_frame", tf2::TimePointZero);
+          "map", this->base_frame, tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "particle_filter_base_frame", ex.what());
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", this->base_frame, ex.what());
       return;
   }
 
@@ -87,7 +87,7 @@ void controller::pure_pursuit_timer_callback()
 
   // Calculate Dynamic Lookahead based on current speed
   double dynamic_lookahead = std::clamp(this->current_velocity * this->get_parameter("K_L").as_double(), this->get_parameter("MIN_L").as_double(), this->get_parameter("MAX_L").as_double());
-
+  //double dynamic_lookahead = this->get_parameter("LOOK_AHEAD_DISTANCE").as_double(); // For fixed lookahead testing
   // Find closest point (Modulo Wrap-around)
   float min_dist = std::numeric_limits<float>::infinity();
   int closest_index = -1;
@@ -136,7 +136,7 @@ void controller::pure_pursuit_timer_callback()
   car_pos.point.z = 0.0;
  
   try {    
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "particle_filter_base_frame");
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, this->base_frame);
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'particle_filter_base_frame': %s", ex.what());
     return;
@@ -175,9 +175,9 @@ void controller::MikaTim_pure_pursuit_timer_callback()
 
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "particle_filter_base_frame", tf2::TimePointZero);
+          "map", this->base_frame, tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "particle_filter_base_frame", ex.what());
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", this->base_frame, ex.what());
       return;
   }
 
@@ -250,7 +250,7 @@ void controller::MikaTim_pure_pursuit_timer_callback()
  
   // particle_filter_base_frame
   try {
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "particle_filter_base_frame");
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, this->base_frame);
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'particle_filter_base_frame': %s", ex.what());
     return;
