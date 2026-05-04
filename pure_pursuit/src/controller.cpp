@@ -146,8 +146,9 @@ void controller::pure_pursuit_timer_callback()
   double ly = goal_car_frame.point.y;  
 
   // Calculate steering angle
-  double alpha = std::atan2(ly, lx);
-  this->steering_angle = std::atan2((2 * WHEELBASE_LENGTH * std::sin(alpha)), dynamic_lookahead);
+  double alpha = std::atan2(ly, lx);  
+  this->steering_angle = std::atan2((2 * WHEELBASE_LENGTH * std::sin(alpha)), dynamic_lookahead)/2.0; // Dividing by 2 because of mismatch of steering angle
+
 
   // Set Dynamic Velocity based on Steering Angle
   // Higher steering angle = lower velocity
