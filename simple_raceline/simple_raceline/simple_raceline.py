@@ -22,7 +22,6 @@ import numpy
 
 # ROS2 client library
 import rclpy
-from algorithms import compute_centered_raceline, compute_simple_raceline
 
 # ROS messages
 from geometry_msgs.msg import (
@@ -43,6 +42,11 @@ from rclpy.node import Node
 from rclpy.qos import (
     DurabilityPolicy,
     QoSProfile,
+)
+
+from simple_raceline.algorithms import (
+    compute_centered_raceline,
+    compute_simple_raceline,
 )
 
 ######################
