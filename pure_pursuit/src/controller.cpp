@@ -175,7 +175,7 @@ void controller::MikaTim_pure_pursuit_timer_callback()
 
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "ego_racecar/base_link", tf2::TimePointZero);
+          "map", "particle_filter_base_frame", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
       RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "particle_filter_base_frame", ex.what());
       return;
