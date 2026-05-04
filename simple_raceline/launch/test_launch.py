@@ -136,23 +136,23 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # rViz2
-    ld.append(
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            arguments=[
-                "-d",
-                PathJoinSubstitution(
-                    [
-                        FindPackageShare("simple_raceline"),
-                        "launch",
-                        "test_launch.rviz",
-                    ]
-                ),
-            ],
-            on_exit=Shutdown(),
-        )
-    )
+    # ld.append(
+    #     Node(
+    #         package="rviz2",
+    #         executable="rviz2",
+    #         name="rviz2",
+    #         arguments=[
+    #             "-d",
+    #             PathJoinSubstitution(
+    #                 [
+    #                     FindPackageShare("simple_raceline"),
+    #                     "launch",
+    #                     "test_launch.rviz",
+    #                 ]
+    #             ),
+    #         ],
+    #         on_exit=Shutdown(),
+    #     )
+    # )
 
     return LaunchDescription(ld)

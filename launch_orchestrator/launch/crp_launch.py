@@ -114,6 +114,7 @@ def generate_launch_description() -> LaunchDescription:
                     "safety": safety,
                     "sparse": sparse,
                     "closed_loop": closed_loop,
+                    "algorithm": "centered",
                 },
             ],
         )

@@ -19,10 +19,10 @@ controller::controller() : Node("controller")
   this->target_velocity = 0.0;
   this->steering_angle = 0.0;
   this->declare_parameter<double>("K_L", 0.32); // Lookahead gain (seconds). Increase for more stability.
-  this->declare_parameter<double>("MIN_L", 0.1); // Minimum lookahead distance (meters)
-  this->declare_parameter<double>("MAX_L", 0.3); // Maximum lookahead distance (meters)
-  this->declare_parameter<double>("MAX_V", 1.0); // Top speed on straights (m/s)
-  this->declare_parameter<double>("MIN_V", 0.5); // Minimum speed in sharp turns (m/s)
+  this->declare_parameter<double>("MIN_L", 0.5); // Minimum lookahead distance (meters)
+  this->declare_parameter<double>("MAX_L", 3); // Maximum lookahead distance (meters)
+  this->declare_parameter<double>("MAX_V", 10.0); // Top speed on straights (m/s)
+  this->declare_parameter<double>("MIN_V", 1.0); // Minimum speed in sharp turns (m/s)
   this->declare_parameter<double>("MAX_STEER", 0.218); // Max steering limit (approx 24 degrees)
 
 
@@ -133,7 +133,7 @@ void controller::pure_persuit_timer_callback()
   car_pos.point.z = 0.0;
  
   try {    
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "odom");
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, "ego_racecar/base_link");
   } catch (const tf2::TransformException & ex) {
     RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'ego_racecar/base_link': %s", ex.what());
     return;
