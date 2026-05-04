@@ -36,7 +36,7 @@ def generate_launch_description() -> LaunchDescription:
     sparse = LaunchConfiguration("sparse")
     closed_loop = LaunchConfiguration("closed_loop")
     map_yaml = LaunchConfiguration("map_yaml")
-    
+
     ld = []
 
     # Arguments
@@ -44,33 +44,40 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             name="map_yaml",
             # Provide a fallback default or leave it empty to force user input
-            default_value=PathJoinSubstitution([
-                FindPackageShare("launch_orchestrator"),
-                "maps",
-                "crazy_map.yaml",
-            ]),
-            description="Full path to the SLAM-generated map yaml file"
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare("launch_orchestrator"),
+                    "maps",
+                    "crazy_map.yaml",
+                ]
+            ),
+            description="Full path to the SLAM-generated map yaml file",
         )
     )
+
+    ld.append(
+        DeclareLaunchArgument(
+            name="algorithm",
+            default_value="simple",
+            description=("algorithm to use [options: 'simple', 'centered']"),
+        )
+    )
+
     ld.append(DeclareLaunchArgument(name="safety", default_value="5"))
 
     ld.append(
         DeclareLaunchArgument(
-            name = "sparse",
-            default_value = "5",
-            description = (
-                "[-] 1 / sampling ratio for the final raceline"
-            ),
+            name="sparse",
+            default_value="5",
+            description=("[-] 1 / sampling ratio for the final raceline"),
         )
     )
 
     ld.append(
         DeclareLaunchArgument(
-            name = "closed_loop",
-            default_value = "True",
-            description = (
-                "when True, the path is created as a closed loop"
-            ),
+            name="closed_loop",
+            default_value="True",
+            description=("when True, the path is created as a closed loop"),
         )
     )
 
@@ -78,16 +85,18 @@ def generate_launch_description() -> LaunchDescription:
     # Map server
     ld.append(
         Node(
-            package = "nav2_map_server",
-            executable = "map_server",
-            name = "map_server",
-            parameters = [
+            package="nav2_map_server",
+            executable="map_server",
+            name="map_server",
+            parameters=[
                 {
-                    "yaml_filename": PathJoinSubstitution([
-                        FindPackageShare("launch_orchestrator"),
-                        "maps",
-                        "crazy_map.yaml",
-                    ])
+                    "yaml_filename": PathJoinSubstitution(
+                        [
+                            FindPackageShare("launch_orchestrator"),
+                            "maps",
+                            "crazy_map.yaml",
+                        ]
+                    )
                 },
             ],
         )
@@ -96,10 +105,10 @@ def generate_launch_description() -> LaunchDescription:
     # Lifecycle manager (to turn on the map_server)
     ld.append(
         Node(
-            package = "nav2_lifecycle_manager",
-            executable = "lifecycle_manager",
-            name = "lifecycle_manager",
-            parameters = [
+            package="nav2_lifecycle_manager",
+            executable="lifecycle_manager",
+            name="lifecycle_manager",
+            parameters=[
                 {
                     "node_names": [
                         "map_server",
@@ -113,10 +122,10 @@ def generate_launch_description() -> LaunchDescription:
     # Simple raceline node
     ld.append(
         Node(
-            package = "simple_raceline",
-            executable = "simple_raceline",
-            name = "simple_raceline",
-            parameters = [
+            package="simple_raceline",
+            executable="simple_raceline",
+            name="simple_raceline",
+            parameters=[
                 {
                     "safety": safety,
                     "sparse": sparse,
@@ -127,23 +136,24 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # rViz2
-    
+
     ld.append(
         Node(
-            package = "rviz2",
-            executable = "rviz2",
-            name = "rviz2",
-            arguments = [
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            arguments=[
                 "-d",
-                PathJoinSubstitution([
-                    FindPackageShare("simple_raceline"),
-                    "launch",
-                    "test_launch.rviz",
-                ]),
+                PathJoinSubstitution(
+                    [
+                        FindPackageShare("simple_raceline"),
+                        "launch",
+                        "test_launch.rviz",
+                    ]
+                ),
             ],
-            on_exit = Shutdown(),
+            on_exit=Shutdown(),
         )
     )
-    
 
     return LaunchDescription(ld)
