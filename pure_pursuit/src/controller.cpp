@@ -7,7 +7,6 @@ controller::controller() : Node("controller")
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
-  diagnostics_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
   goal_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/goal_point", 10);
   nearest_point_on_raceline_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/nearest_point_on_raceline", 10);
   car_pub = this->create_publisher<geometry_msgs::msg::PointStamped>("/car_pos", 10);
@@ -26,10 +25,17 @@ controller::controller() : Node("controller")
     std::bind(&controller::pure_persuit_timer_callback, this)
   );
 
-  /* diagnostics_timer = this->create_wall_timer(
-    std::chrono::milliseconds(1000), 
+
+  // Diagnostics 
+  diagnostics_timer = this->create_wall_timer(
+    std::chrono::milliseconds(10), 
     std::bind(&controller::diagnostics_timer_callback, this)
-  ); */
+  ); 
+  // Open the log file
+    log_file.open("/arc2026/ws/src/your_code/pure_pursuit/position_log.csv", std::ios::out | std::ios::app);
+    if (log_file.is_open()) {
+        log_file << "timestamp,x,y\n"; // Write header
+    }
 
   // TF buffer initilization
   this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -73,6 +79,8 @@ void controller::pure_persuit_timer_callback()
 
   double car_x = map_to_base_link.transform.translation.x;
   double car_y = map_to_base_link.transform.translation.y;
+  this->latest_car_x = car_x;
+  this->latest_car_y = car_y;
 
   // 1. Calculate Dynamic Lookahead based on current speed
   // Note: Using the last commanded speed or odom speed if available
@@ -172,25 +180,23 @@ void controller::construct_and_publish_drive_message()
 
 void controller::diagnostics_timer_callback()
 {
-    diagnostic_msgs::msg::DiagnosticArray array_msg;
-    array_msg.header.stamp = this->now();
+    if (log_file.is_open()) {
+        // Log current time (ROS 2 time), X, and Y
+        log_file << this->now().seconds() << "," 
+                 << this->latest_car_x << "," 
+                 << this->latest_car_y << "\n";
+        
+        // Flush to ensure data is written if the node crashes
+        log_file.flush();
+    }
 
-    diagnostic_msgs::msg::DiagnosticStatus status_msg;
-    status_msg.name = "safety_node";
-    status_msg.hardware_id = "f1tenth_car";
-
-
-    status_msg.level = diagnostic_msgs::msg::DiagnosticStatus::OK;
-    status_msg.message = "Not used";
-    
-
-    array_msg.status.push_back(status_msg);
-
-    diagnostics_pub->publish(array_msg);
-    std::cout << "successfull ended callback" << std::endl;
 }
 
-
+controller::~controller() {
+    if (log_file.is_open()) {
+        log_file.close();
+    }
+}
 
 int main(int argc, char ** argv)
 {

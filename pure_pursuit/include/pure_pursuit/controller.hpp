@@ -35,6 +35,8 @@
 #include <geometry_msgs/msg/point_stamped.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
+#include <fstream>
+
 
 // GLOBAL CONSTANTS
 #define WHEELBASE_LENGTH 0.33
@@ -45,16 +47,23 @@ class controller : public rclcpp::Node
 public:
     // variables
 
-    // constructor
+    // constructor destructor
     controller();
+    ~controller();
 
 private:
     // PARAMETERS
+    double latest_car_x = 0.0;
+    double latest_car_y = 0.0;
+    std::ofstream log_file;
 
     // timer parameters
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     
+    rclcpp::TimerBase::SharedPtr pure_persuit_timer;
+    void pure_persuit_timer_callback();
+
     /* ---- Diagnostics ---- */
     
 
@@ -80,16 +89,13 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_point_on_raceline_pub;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr car_pub;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
-    rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diagnostics_pub;
 
 
     // methods
     void path_callback(const nav_msgs::msg::Path::SharedPtr msg);
     void construct_and_publish_drive_message();
 
-    // timer
-    rclcpp::TimerBase::SharedPtr pure_persuit_timer;
-    void pure_persuit_timer_callback();
+    
 
     rclcpp::TimerBase::SharedPtr diagnostics_timer;
     void diagnostics_timer_callback();
