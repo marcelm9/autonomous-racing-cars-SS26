@@ -113,6 +113,7 @@ class RacelineNode(Node):
             "simple": compute_simple_raceline,
             "centered": compute_centered_raceline,
         }
+        self.get_logger().info(f"Using algorithm: {self._algorithm}")
 
         # Subscribers
         self.create_subscription(
