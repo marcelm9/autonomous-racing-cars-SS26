@@ -31,7 +31,7 @@ controller::controller() : Node("controller")
   this->declare_parameter<double>("L_INCREMENT", 0.2);
 
   // timers
-  pure_persuit_timer = this->create_wall_timer(
+  pure_pursuit_timer = this->create_wall_timer(
     std::chrono::milliseconds(50),
     std::bind(&controller::pure_pursuit_timer_callback, this)
   );
@@ -63,7 +63,7 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
   this->path_received_ = true;
 }
 
-void controller::pure_persuit_timer_callback()
+void controller::pure_pursuit_timer_callback()
 {
   if (!this->path_received_) {
     RCLCPP_INFO(this->get_logger(), "No path received");

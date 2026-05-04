@@ -61,8 +61,8 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     
-    rclcpp::TimerBase::SharedPtr pure_persuit_timer;
-    void pure_persuit_timer_callback();
+    rclcpp::TimerBase::SharedPtr pure_pursuit_timer;
+    void pure_pursuit_timer_callback();
 
     void MikaTim_pure_pursuit_timer_callback();
     /* ---- Diagnostics ---- */
