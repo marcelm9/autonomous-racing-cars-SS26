@@ -4,7 +4,7 @@
 `colcon build --packages-select reactive`
 
 ## Source Files
-`source /opt/ros/jazzy/setup.bash`
+`source /opt/ros/jazzy/setup.bash` `&&`
 `source install/setup.bash`
 
 ## Things you might want to launch
