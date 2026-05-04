@@ -3,6 +3,7 @@
 
 
 import os
+from importlib_metadata import PackageNotFoundError
 import yaml
 
 from launch import LaunchDescription
@@ -22,10 +23,18 @@ def generate_launch_description() -> LaunchDescription:
     safety = LaunchConfiguration("safety")
     sparse = LaunchConfiguration("sparse")
     closed_loop = LaunchConfiguration("closed_loop")
+    map_file = LaunchConfiguration("map")
 
     ld = []
 
     # --- ARGUMENTS --- #
+    ld.append(
+        DeclareLaunchArgument(
+            "map",
+            default_value="crazy_map.yaml",
+            description="Name of the map yaml file in the launch_orchestrator/maps folder"
+        )
+    )
     ld.append(
         DeclareLaunchArgument(
             name = "safety",
@@ -58,7 +67,7 @@ def generate_launch_description() -> LaunchDescription:
 
 
     # --- NODES --- #
-
+    
     # Map server
     ld.append(
         Node(
@@ -70,13 +79,13 @@ def generate_launch_description() -> LaunchDescription:
                     "yaml_filename": PathJoinSubstitution([
                         FindPackageShare("launch_orchestrator"),
                         "maps",
-                        "crazy_map.yaml",
+                        map_file,
                     ])
                 },
             ],
         )
     )
-
+    
     # Lifecycle manager (to turn on the map_server)
     ld.append(
         Node(
@@ -93,7 +102,7 @@ def generate_launch_description() -> LaunchDescription:
             ],
         )
     )
-
+    
     # SimpleRaceline Node
     ld.append(
         Node(
@@ -141,14 +150,16 @@ def generate_launch_description() -> LaunchDescription:
 
 
     # --- OTHER LAUNCH FILES --- #
-
-    # Bringup Launch
-    pkg_path = get_package_share_directory('f1tenth_stack')
-    launch_file = 'bringup_launch.py'
+    try: 
+        launch_path = get_package_share_directory('f1tenth_gym_ros')
+        launch_file = 'gym_bridge_launch.py'
+    except PackageNotFoundError:
+        launch_path = get_package_share_directory('f1tenth_stack')
+        launch_file = 'bringup_launch.py'
     ld.append(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(pkg_path, 'launch', launch_file)
+                os.path.join(launch_path, 'launch', launch_file)
             )
         )
     )

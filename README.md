@@ -72,3 +72,7 @@ To launch run
     Durability Policy: `Transiet Local` 
 
 
+### Launch crp_launch Arguments
+ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
+
+

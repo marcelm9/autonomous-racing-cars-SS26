@@ -69,11 +69,12 @@ void controller::pure_persuit_timer_callback()
   // ---------------------------------------------------------------------
 
   geometry_msgs::msg::TransformStamped map_to_base_link;
+
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "particle_filter_base_frame", tf2::TimePointZero);
+          "map", "ego_racecar/base_link", tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "ego_racecar/base_link", ex.what());
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "particle_filter_base_frame", ex.what());
       return;
   }
 
@@ -132,7 +133,7 @@ void controller::pure_persuit_timer_callback()
   car_pos.point.x = car_x;
   car_pos.point.y = car_y;
   car_pos.point.z = 0.0; // Point fields must be initialized
-
+ 
   try {    
     tf_buffer_->transform(goal_map_frame, goal_car_frame, "particle_filter_base_frame");
   } catch (const tf2::TransformException & ex) {
