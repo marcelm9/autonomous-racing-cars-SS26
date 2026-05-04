@@ -244,7 +244,7 @@ class ParticleFiler(Node):
         # header
         t.header.stamp = stamp
         t.header.frame_id = '/map'
-        t.child_frame_id = '/odom'
+        t.child_frame_id = '/particle_filter_base_frame'
         # translation
         t.transform.translation.x = pose[0]
         t.transform.translation.y = pose[1]
