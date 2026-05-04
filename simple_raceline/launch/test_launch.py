@@ -10,21 +10,18 @@ https://docs.ros.org/en/jazzy/Tutorials/Intermediate/Launch/Using-Substitutions.
 from launch import (
     LaunchDescription,
 )
-
 from launch.actions import (
     DeclareLaunchArgument,
     Shutdown,
+    TimerAction,
 )
-
 from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
 )
-
 from launch_ros.actions import (
     Node,
 )
-
 from launch_ros.substitutions import (
     FindPackageShare,
 )
@@ -36,6 +33,7 @@ def generate_launch_description() -> LaunchDescription:
     sparse = LaunchConfiguration("sparse")
     closed_loop = LaunchConfiguration("closed_loop")
     map_yaml = LaunchConfiguration("map_yaml")
+    algorithm = LaunchConfiguration("algorithm")
 
     ld = []
 
@@ -90,32 +88,33 @@ def generate_launch_description() -> LaunchDescription:
             name="map_server",
             parameters=[
                 {
-                    "yaml_filename": PathJoinSubstitution(
-                        [
-                            FindPackageShare("launch_orchestrator"),
-                            "maps",
-                            "crazy_map.yaml",
-                        ]
-                    )
+                    "yaml_filename": map_yaml,
                 },
             ],
         )
     )
 
     # Lifecycle manager (to turn on the map_server)
+    # Wrapped in a TimerAction to allow DDS discovery to settle
+    lifecycle_manager_node = Node(
+        package="nav2_lifecycle_manager",
+        executable="lifecycle_manager",
+        name="lifecycle_manager",
+        parameters=[
+            {
+                "node_names": [
+                    "map_server",
+                ],
+                "autostart": True,
+                "bond_timeout": 4.0,  # Increased timeout for stability
+            },
+        ],
+    )
+
     ld.append(
-        Node(
-            package="nav2_lifecycle_manager",
-            executable="lifecycle_manager",
-            name="lifecycle_manager",
-            parameters=[
-                {
-                    "node_names": [
-                        "map_server",
-                    ],
-                    "autostart": True,
-                },
-            ],
+        TimerAction(
+            period=2.0,  # 2 second delay before starting the lifecycle manager
+            actions=[lifecycle_manager_node],
         )
     )
 
@@ -127,6 +126,7 @@ def generate_launch_description() -> LaunchDescription:
             name="simple_raceline",
             parameters=[
                 {
+                    "algorithm": algorithm,
                     "safety": safety,
                     "sparse": sparse,
                     "closed_loop": closed_loop,
@@ -136,7 +136,6 @@ def generate_launch_description() -> LaunchDescription:
     )
 
     # rViz2
-
     ld.append(
         Node(
             package="rviz2",
