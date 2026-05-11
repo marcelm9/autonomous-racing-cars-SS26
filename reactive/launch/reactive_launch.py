@@ -49,6 +49,9 @@ def generate_launch_description():
         executable='reactive',
         name='reactive',
         output='screen',
+        parameters=[{
+            'max_speed': LaunchConfiguration('max_speed')
+        }],
         remappings=[
             ('/scan', LaunchConfiguration('scan_topic')), 
             ('/odom', LaunchConfiguration('odom_topic')),

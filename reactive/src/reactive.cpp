@@ -17,6 +17,7 @@ FollowGap::FollowGap() : Node("reactive")
       std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
+  this->declare_parameter<double>("max_speed", 20.0);
 }
 
 /* ---- CALLBACKS ---- */
@@ -24,6 +25,8 @@ FollowGap::FollowGap() : Node("reactive")
 void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg)
 {
   this->scan_msg = *scan_msg;
+
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
 
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
@@ -224,10 +227,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // set final goal angle 
-  goal_angle = (goal_angle - correction_left + correction_right)/1.5;
+  goal_angle = (goal_angle - correction_left + correction_right);
 
 
   //// SPEED ////
+
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
+
   // Set the speed depending on the open space in front of the car
   min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_front;
@@ -256,7 +262,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.2f, 0.2f); // should be 0.34
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.34f, 0.34f); // should be 0.34
   drive_msg.drive.speed = set_speed;
   drive_speed_pub->publish(drive_msg);
 
