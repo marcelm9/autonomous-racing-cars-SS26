@@ -6,8 +6,15 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
 
 def generate_launch_description():
+    use_sim_arg = DeclareLaunchArgument(
+        'use_sim',
+        default_value='true',
+        description='Whether to launch the f1tenth simulator bridge'
+    )
+    
     scan_topic_arg = DeclareLaunchArgument(
         'scan_topic',
         default_value='/scan',
@@ -32,7 +39,8 @@ def generate_launch_description():
     sim_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_f1tenth_gym_ros, 'launch', 'gym_bridge_launch.py')
-        )
+        ),
+        condition=IfCondition(LaunchConfiguration('use_sim'))
     )
 
     
@@ -49,6 +57,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        use_sim_arg,
         scan_topic_arg,
         odom_topic_arg,
         drive_topic_arg,
