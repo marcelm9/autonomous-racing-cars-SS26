@@ -4,9 +4,29 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-    # 1. Path to the simulator launch file
+    scan_topic_arg = DeclareLaunchArgument(
+        'scan_topic',
+        default_value='/scan',
+        description='Topic name for laser scan'
+    )
+    
+    odom_topic_arg = DeclareLaunchArgument(
+        'odom_topic',
+        default_value='/ego_racecar/odom',
+        description='Topic name for odometry'
+    )
+    
+    drive_topic_arg = DeclareLaunchArgument(
+        'drive_topic',
+        default_value='/drive',
+        description='Topic name for drive commands'
+    )
+    
+    
     pkg_f1tenth_gym_ros = get_package_share_directory('f1tenth_gym_ros')
     
     sim_launch = IncludeLaunchDescription(
@@ -15,18 +35,16 @@ def generate_launch_description():
         )
     )
 
-    # 2. Your Reactive Node
-    # Note: Topic names in the simulator are usually /scan and /ego_racecar/odom.
-    # If your code uses different names, use the 'remappings' argument below.
+    
     reactive = Node(
         package='reactive',
         executable='reactive',
         name='reactive',
         output='screen',
         remappings=[
-            # Example: ('internal_name', 'simulator_name')
-            # ('/scan', '/scan'), 
-            # ('/odom', '/ego_racecar/odom'),
+            ('/scan', LaunchConfiguration('scan_topic')), 
+            ('/odom', LaunchConfiguration('odom_topic')),
+            ('/drive', LaunchConfiguration('drive_topic')),
         ]
     )
 
