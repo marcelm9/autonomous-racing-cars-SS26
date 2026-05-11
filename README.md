@@ -27,7 +27,7 @@
 ### Launch reactive node
 `ros2 launch reactive reactive_launch.py`
 ## With Custom remappings usefull for multi car launch
-`ros2 launch reactive reactive_launch.py scan_topic:=/opp_scan odom_topic:=/opp_racecar/opp_odom drive_topic:=/opp_drive`
+`ros2 launch reactive reactive_launch.py scan_topic:=/opp_scan odom_topic:=/opp_racecar/opp_odom drive_topic:=/opp_drive use_sim:=false`
 
 
 ### Launch reactive and safety node
