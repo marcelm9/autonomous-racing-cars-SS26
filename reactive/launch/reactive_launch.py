@@ -49,6 +49,10 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        scan_topic_arg,
+        odom_topic_arg,
+        drive_topic_arg,
+        
         sim_launch,
         reactive
     ])
