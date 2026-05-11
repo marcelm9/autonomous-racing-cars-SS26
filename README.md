@@ -82,6 +82,32 @@ To launch run
 ### Launch crp_launch Arguments
 ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
+# Foxglove Setup
+im Container installieren:
+
+sudo apt update
+sudo apt install ros-jazzy-foxglove-bridge
+
+diese node muss im Hintergrund laufen:
+
+ros2 run foxglove_bridge foxglove_bridge
+
+Port 8765 nach außen legen:
+in VS Code neben dem Terminal bei Ports 8765 hinzufügen
+
+Bei Foxglove anmelden: studio.foxglove.dev
+configs finden sich in configs/foxglove
+
+# Tunable Parameters
+
+in der .hpp als Parameter definieren:
+double MAXDRIVESPEED;
+
+in der .cpp:
+    FollowGap::FollowGap() : Node("reactive")
+        this->declare_parameter<double>("max_speed", 20.0);
+    im callback:
+        this->get_parameter("max_speed", this->MAXDRIVESPEED);
 
 # git naming convention
 
