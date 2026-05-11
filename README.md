@@ -82,6 +82,21 @@ To launch run
 ### Launch crp_launch Arguments
 ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
+# Roxglove Setup
+im Container installieren:
+
+sudo apt update
+sudo apt install ros-jazzy-foxglove-bridge
+
+diese node muss im Hintergrund laufen:
+
+ros2 run foxglove_bridge foxglove_bridge
+
+Port 8765 nach außen legen:
+in VS Code neben dem Terminal bei Ports 8765 hinzufügen
+
+Bei Foxglove anmelden: studio.foxglove.dev
+configs finden sich in configs/foxglove
 
 # git naming convention
 

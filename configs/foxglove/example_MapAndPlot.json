@@ -1,0 +1,225 @@
+{
+  "configById": {
+    "Plot!3w7cz9n": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/drive.drive.speed",
+          "enabled": true,
+          "color": "#4e98e2",
+          "id": "c0d015e9-d43b-4452-9068-f814ea954f12"
+        }
+      ]
+    },
+    "3D!18i6zy7": {
+      "layers": {
+        "845139cb-26bc-40b3-8161-8ab60af4baf5": {
+          "visible": false,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "845139cb-26bc-40b3-8161-8ab60af4baf5",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        },
+        "e0b72955-2254-4018-8546-d511e13c0166": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "visual",
+          "fallbackColor": "#ff00d6",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "e0b72955-2254-4018-8546-d511e13c0166",
+          "layerId": "foxglove.Urdf",
+          "label": "opp_racecar_model",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opp_robot_description",
+          "framePrefix": "",
+          "order": 2
+        },
+        "46e3a078-8bc9-42f0-9fa3-953f4155103e": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ff00d6",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "46e3a078-8bc9-42f0-9fa3-953f4155103e",
+          "layerId": "foxglove.Urdf",
+          "label": "ego_racecar_model",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/ego_robot_description",
+          "framePrefix": "",
+          "order": 2
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 24.554753263089914,
+        "phi": 29.95205729832698,
+        "thetaOffset": -31.29599998915339,
+        "targetOffset": [
+          8.188882794132331,
+          -9.85758216723596,
+          -3.083271972293313e-16
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-none",
+      "followTf": "map",
+      "fixedFrame": "map",
+      "scene": {
+        "enableStats": false
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": false
+        },
+        "frame:opp_racecar/front_left_hinge": {
+          "visible": false
+        },
+        "frame:opp_racecar/front_left_wheel": {
+          "visible": false
+        },
+        "frame:opp_racecar/front_right_hinge": {
+          "visible": false
+        },
+        "frame:opp_racecar/front_right_wheel": {
+          "visible": false
+        },
+        "frame:ego_racecar/base_link": {
+          "visible": false
+        },
+        "frame:opp_racecar/base_link": {
+          "visible": false
+        },
+        "frame:ego_racecar/laser": {
+          "visible": true
+        },
+        "frame:opp_racecar/laser": {
+          "visible": true
+        },
+        "frame:ego_racecar/front_left_hinge": {
+          "visible": false
+        },
+        "frame:ego_racecar/front_left_wheel": {
+          "visible": false
+        },
+        "frame:ego_racecar/front_right_hinge": {
+          "visible": false
+        },
+        "frame:ego_racecar/front_right_wheel": {
+          "visible": false
+        },
+        "frame:ego_racecar/back_left_wheel": {
+          "visible": false
+        },
+        "frame:ego_racecar/back_right_wheel": {
+          "visible": false
+        },
+        "frame:ego_racecar/laser_model": {
+          "visible": false
+        },
+        "frame:opp_racecar/back_left_wheel": {
+          "visible": false
+        },
+        "frame:opp_racecar/back_right_wheel": {
+          "visible": false
+        },
+        "frame:opp_racecar/laser_model": {
+          "visible": false
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true
+        },
+        "/scan": {
+          "visible": true,
+          "colorField": "intensity",
+          "colorMode": "colormap",
+          "colorMap": "turbo"
+        },
+        "/gap_vis": {
+          "visible": true
+        }
+      },
+      "publish": {
+        "type": "point",
+        "poseTopic": "/move_base_simple/goal",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "synchronize": false,
+      "imageMode": {}
+    },
+    "Parameters!4hr9g4q": {}
+  },
+  "globalVariables": {
+    "max_speed": 9
+  },
+  "userNodes": {
+    "44ce5920-e655-492c-9e9d-94037be6f210": {
+      "sourceCode": "// Den Import oben einfach weglassen, das macht es oft komplizierter als nötig\n\nexport const inputs = [\"variables.max_speed\"];\nexport const output = \"/reactive.max_speed\"; // Achte darauf, dass dieses Topic in deinem C++ Subscriber steht\n\nexport default function script(data: any) {\n  // Falls die Variable noch nicht existiert (daher die Fehlermeldung), schicken wir nichts\n  if (data.variables.max_speed === undefined) {\n    return undefined;\n  }\n\n  return {\n    data: data.variables.max_speed,\n  };\n}\n",
+      "name": "44ce5920"
+    }
+  },
+  "playbackConfig": {
+    "speed": 1
+  },
+  "drawerConfig": {
+    "tracks": []
+  },
+  "layout": {
+    "direction": "row",
+    "first": "Plot!3w7cz9n",
+    "second": {
+      "first": "3D!18i6zy7",
+      "second": "Parameters!4hr9g4q",
+      "direction": "row",
+      "splitPercentage": 62.22222222222222
+    },
+    "splitPercentage": 26.264134841049714
+  }
+}
