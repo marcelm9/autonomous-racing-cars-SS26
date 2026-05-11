@@ -3,12 +3,11 @@
 
 
 import os
-from importlib_metadata import PackageNotFoundError
 import yaml
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -18,6 +17,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
+from launch.conditions import IfCondition
+
 def generate_launch_description() -> LaunchDescription:
     """Entry point function called by ros2 launch."""
     safety = LaunchConfiguration("safety")
@@ -25,7 +26,24 @@ def generate_launch_description() -> LaunchDescription:
     closed_loop = LaunchConfiguration("closed_loop")
     map_file = LaunchConfiguration("map")
 
+    mode_arg = DeclareLaunchArgument(
+        'mode',
+        default_value='sim',
+        description='Selection of hardware target: "sim", "car", or "none"'
+    )
+    
+    scan_topic = LaunchConfiguration("scan_topic")
+    odom_topic = LaunchConfiguration("odom_topic")
+    drive_topic = LaunchConfiguration("drive_topic")
+    
     ld = []
+    
+    ld.append(DeclareLaunchArgument("use_sim", default_value="false", description="Launch simulator?"))
+    ld.append(DeclareLaunchArgument("car_launch", default_value="false", description="Launch car?"))
+    ld.append(DeclareLaunchArgument("scan_topic", default_value="/scan"))
+    ld.append(DeclareLaunchArgument("odom_topic", default_value="/ego_racecar/odom"))
+    ld.append(DeclareLaunchArgument("drive_topic", default_value="/drive"))
+    
 
     # --- ARGUMENTS --- #
     ld.append(
@@ -145,25 +163,30 @@ def generate_launch_description() -> LaunchDescription:
             executable='controller',
             name='controller',
             output='screen',
-            remappings=[]
+            remappings=[('/scan', scan_topic),
+                ('/odom', odom_topic),
+                ('/drive', drive_topic),]
         )
     )
 
 
-    # --- OTHER LAUNCH FILES --- #
-    try: 
-        launch_path = get_package_share_directory('f1tenth_gym_ros')
-        launch_file = 'gym_bridge_launch.py'
-    except PackageNotFoundError:
-        launch_path = get_package_share_directory('f1tenth_stack')
-        launch_file = 'bringup_launch.py'
-    ld.append(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(launch_path, 'launch', launch_file)
-            )
-        )
-    )
+  
+    
 
+    ld.append(IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'launch', 'gym_bridge_launch.py')
+        ),
+        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('mode'), "' == 'sim'"]))
+    ))
+
+    ld.append(IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('f1tenth_stack'), 'launch', 'bringup_launch.py')
+        ),
+        condition=IfCondition(PythonExpression(["'", LaunchConfiguration('mode'), "' == 'car'"]))
+    ))
+
+    ld.append(mode_arg) 
 
     return LaunchDescription(ld)
