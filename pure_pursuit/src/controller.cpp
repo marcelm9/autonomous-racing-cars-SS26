@@ -18,19 +18,22 @@ controller::controller() : Node("controller")
   this->current_velocity = 0.0;
   this->target_velocity = 0.0;
   this->steering_angle = 0.0;
+    // for steering angle based dynamic lookahead
   this->declare_parameter<double>("K_L", 0.32); // Lookahead gain (seconds). Increase for more stability.
-  this->declare_parameter<double>("MIN_L", 0.1); // Minimum lookahead distance (meters)
-  this->declare_parameter<double>("MAX_L", 0.3); // Maximum lookahead distance (meters)
-  this->declare_parameter<double>("MAX_V", 1.0); // Top speed on straights (m/s)
-  this->declare_parameter<double>("MIN_V", 0.5); // Minimum speed in sharp turns (m/s)
+  this->declare_parameter<double>("MIN_L", 0.2); // Minimum lookahead distance (meters)
+  this->declare_parameter<double>("MAX_L", 3); // Maximum lookahead distance (meters)
+  this->declare_parameter<double>("MAX_V", 10.0); // Top speed on straights (m/s)
+  this->declare_parameter<double>("MIN_V", 1.0); // Minimum speed in sharp turns (m/s)
   this->declare_parameter<double>("MAX_STEER", 0.218); // Max steering limit (approx 24 degrees)
 
-
+    // for lockahead angle based dynamic lookahead
+  this->declare_parameter<double>("MAX_L_ANGLE", 0.3); 
+  this->declare_parameter<double>("L_INCREMENT", 0.2);
 
   // timers
-  pure_persuit_timer = this->create_wall_timer(
+  pure_pursuit_timer = this->create_wall_timer(
     std::chrono::milliseconds(50),
-    std::bind(&controller::pure_persuit_timer_callback, this)
+    std::bind(&controller::pure_pursuit_timer_callback, this)
   );
 
 
@@ -60,7 +63,7 @@ void controller::path_callback(const nav_msgs::msg::Path::SharedPtr msg)
   this->path_received_ = true;
 }
 
-void controller::pure_persuit_timer_callback()
+void controller::pure_pursuit_timer_callback()
 {
   if (!this->path_received_) {
     RCLCPP_INFO(this->get_logger(), "No path received");
@@ -71,9 +74,9 @@ void controller::pure_persuit_timer_callback()
 
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "ego_racecar/base_link", tf2::TimePointZero);
+          "map", this->base_frame, tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "odom", ex.what());
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", this->base_frame, ex.what());
       return;
   }
 
@@ -84,7 +87,7 @@ void controller::pure_persuit_timer_callback()
 
   // Calculate Dynamic Lookahead based on current speed
   double dynamic_lookahead = std::clamp(this->current_velocity * this->get_parameter("K_L").as_double(), this->get_parameter("MIN_L").as_double(), this->get_parameter("MAX_L").as_double());
-
+  //double dynamic_lookahead = this->get_parameter("LOOK_AHEAD_DISTANCE").as_double(); // For fixed lookahead testing
   // Find closest point (Modulo Wrap-around)
   float min_dist = std::numeric_limits<float>::infinity();
   int closest_index = -1;
@@ -133,9 +136,9 @@ void controller::pure_persuit_timer_callback()
   car_pos.point.z = 0.0;
  
   try {    
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "odom");
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, this->base_frame);
   } catch (const tf2::TransformException & ex) {
-    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'ego_racecar/base_link': %s", ex.what());
+    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'particle_filter_base_frame': %s", ex.what());
     return;
   }
 
@@ -143,8 +146,9 @@ void controller::pure_persuit_timer_callback()
   double ly = goal_car_frame.point.y;  
 
   // Calculate steering angle
-  double alpha = std::atan2(ly, lx);
-  this->steering_angle = std::atan2((2 * WHEELBASE_LENGTH * std::sin(alpha)), dynamic_lookahead);
+  double alpha = std::atan2(ly, lx);  
+  this->steering_angle = std::atan2((2 * WHEELBASE_LENGTH * std::sin(alpha)), dynamic_lookahead)/2.0; // Dividing by 2 because of mismatch of steering angle
+
 
   // Set Dynamic Velocity based on Steering Angle
   // Higher steering angle = lower velocity
@@ -172,9 +176,9 @@ void controller::MikaTim_pure_pursuit_timer_callback()
 
   try {
       map_to_base_link = this->tf_buffer_->lookupTransform(
-          "map", "ego_racecar/base_link", tf2::TimePointZero);
+          "map", this->base_frame, tf2::TimePointZero);
   } catch (const tf2::TransformException & ex) {
-      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", "odom", ex.what());
+      RCLCPP_INFO(this->get_logger(), "Could not transform %s to %s: %s", "map", this->base_frame, ex.what());
       return;
   }
 
@@ -183,10 +187,11 @@ void controller::MikaTim_pure_pursuit_timer_callback()
   this->latest_car_x = car_x;
   this->latest_car_y = car_y;
 
-  // Calculate Dynamic Lookahead based on current speed
-  double dynamic_lookahead = std::clamp(this->current_velocity * this->get_parameter("K_L").as_double(), this->get_parameter("MIN_L").as_double(), this->get_parameter("MAX_L").as_double());
+  // Increase lockahead until angle to lockahead is higher than max angle
+  double dynamic_lookahead = this->get_parameter("MIN_L").as_double();
+  
 
-  // Find closest point (Modulo Wrap-around)
+  // Find closest point 
   float min_dist = std::numeric_limits<float>::infinity();
   int closest_index = -1;
   size_t path_size = this->current_path.poses.size();
@@ -206,14 +211,25 @@ void controller::MikaTim_pure_pursuit_timer_callback()
   // Find goal point using wrap-around
   geometry_msgs::msg::PoseStamped goal_point = this->current_path.poses[closest_index]; 
   for (size_t i = 0; i < path_size; ++i) {
-      size_t idx = (closest_index + i) % path_size; // MODULO FIX
+      size_t idx = (closest_index + i) % path_size; 
       const auto & path_point = this->current_path.poses[idx];
       double dist = std::hypot(path_point.pose.position.x - car_x, 
                                path_point.pose.position.y - car_y);
 
       if (dist >= dynamic_lookahead) {
-          goal_point = path_point;
-          break; 
+          float lockahead_angle = std::atan2(path_point.pose.position.y - car_y, path_point.pose.position.x - car_x);
+          if (std::abs(lockahead_angle) > this->get_parameter("MAX_L_ANGLE").as_double()) {
+              goal_point = path_point;
+              break;
+          }
+          else {
+              dynamic_lookahead += this->get_parameter("L_INCREMENT").as_double(); // Increment lookahead and check again
+              if (dynamic_lookahead > this->get_parameter("MAX_L").as_double()) {
+                  goal_point = path_point; // If we exceed max lookahead, just take this point
+                  break;
+              }
+          }
+          
       }
   }
 
@@ -233,10 +249,11 @@ void controller::MikaTim_pure_pursuit_timer_callback()
   car_pos.point.y = car_y;
   car_pos.point.z = 0.0;
  
-  try {    
-    tf_buffer_->transform(goal_map_frame, goal_car_frame, "odom");
+  // particle_filter_base_frame
+  try {
+    tf_buffer_->transform(goal_map_frame, goal_car_frame, this->base_frame);
   } catch (const tf2::TransformException & ex) {
-    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'ego_racecar/base_link': %s", ex.what());
+    RCLCPP_INFO(this->get_logger(), "Could not transform 'goal_map_frame' to 'particle_filter_base_frame': %s", ex.what());
     return;
   }
 

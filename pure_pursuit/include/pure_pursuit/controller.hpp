@@ -61,8 +61,8 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     
-    rclcpp::TimerBase::SharedPtr pure_persuit_timer;
-    void pure_persuit_timer_callback();
+    rclcpp::TimerBase::SharedPtr pure_pursuit_timer;
+    void pure_pursuit_timer_callback();
 
     void MikaTim_pure_pursuit_timer_callback();
     /* ---- Diagnostics ---- */
@@ -79,7 +79,7 @@ private:
     double current_velocity = 0.0; // Tracks the current speed of the car
     double target_velocity = 0.0;  // The calculated speed for the next command
     double steering_angle = 0.0;   // The calculated steering angle
-
+    const char* base_frame = "particle_filter_base_frame"; // particle_filter_base_frame or ego_racecar/base_link depending on TF tree
 
     // subscribers
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub; 

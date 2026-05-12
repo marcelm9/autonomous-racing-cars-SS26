@@ -114,6 +114,7 @@ def generate_launch_description() -> LaunchDescription:
                     "safety": safety,
                     "sparse": sparse,
                     "closed_loop": closed_loop,
+                    "algorithm": "centered",
                 },
             ],
         )
@@ -150,12 +151,13 @@ def generate_launch_description() -> LaunchDescription:
 
 
     # --- OTHER LAUNCH FILES --- #
-    try: 
-        launch_path = get_package_share_directory('f1tenth_gym_ros')
-        launch_file = 'gym_bridge_launch.py'
-    except PackageNotFoundError:
-        launch_path = get_package_share_directory('f1tenth_stack')
-        launch_file = 'bringup_launch.py'
+    #try: #only needed for sim, now on different branch 
+    #    launch_path = get_package_share_directory('f1tenth_gym_ros')
+    #    launch_file = 'gym_bridge_launch.py'
+    #except PackageNotFoundError:
+    
+    launch_path = get_package_share_directory('f1tenth_stack')
+    launch_file = 'bringup_launch.py'
     ld.append(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
