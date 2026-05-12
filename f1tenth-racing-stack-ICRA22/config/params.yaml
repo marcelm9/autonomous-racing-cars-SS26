@@ -1,5 +1,5 @@
 # The following params are for maps
-map_name: 'levine_2nd'
+map_name: 'crazy_map'
 map_img_ext: '.pgm'
 
 # The following params are for path generator
