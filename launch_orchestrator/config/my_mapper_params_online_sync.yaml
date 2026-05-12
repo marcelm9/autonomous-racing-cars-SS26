@@ -30,7 +30,7 @@ slam_toolbox:
     map_update_interval: 2.0
     resolution: 0.025
     restamp_tf: false
-    min_laser_range: 0.0 #for rastering images
+    min_laser_range: 0.01 #for rastering images
     max_laser_range: 30.0 #for rastering images
     minimum_time_interval: 0.2
     transform_timeout: 0.2
@@ -50,15 +50,15 @@ slam_toolbox:
     link_scan_maximum_distance: 1.5
     loop_search_maximum_distance: 1.5
     do_loop_closing: true 
-    loop_match_minimum_chain_size: 10           
+    loop_match_minimum_chain_size: 10        
     loop_match_maximum_variance_coarse: 3.0  
     loop_match_minimum_response_coarse: 0.35    
     loop_match_minimum_response_fine: 0.45
 
     # Correlation Parameters - Correlation Parameters
     correlation_search_space_dimension: 0.4
-    correlation_search_space_resolution: 0.01
-    correlation_search_space_smear_deviation: 0.1 
+    correlation_search_space_resolution: 0.005
+    correlation_search_space_smear_deviation: 0.05 
 
     # Correlation Parameters - Loop Closure Parameters
     loop_search_space_dimension: 8.0
