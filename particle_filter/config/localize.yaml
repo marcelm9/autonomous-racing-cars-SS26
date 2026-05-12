@@ -4,15 +4,15 @@ particle_filter:
     scan_topic: '/scan'
     odometry_topic: '/odom'
     # range data downsampling
-    angle_step: 18 # Lower value -> more precise, higher compute
-    max_particles: 4000 # Higher value -> more precise, higher compute
-    squash_factor: 2.2
+    angle_step: 15
+    max_particles: 4000
+    squash_factor: 4.2 # default 2.2
     # visualization
     viz: 1
     max_viz_particles: 60
     
     # ray marching method
-    range_method: 'rm' # try CDDT
+    range_method: 'cddt'
 
     # Method | Init time (sec) | Random Queries/Sec | Grid Queries/Sec | Memory (MB)
     # BL     | 0.02            | 297,000            | 360,000          | 1.37
@@ -34,7 +34,7 @@ particle_filter:
     z_hit: 0.75 # % actual wall hits
     sigma_hit: 8.0 # Measurement noise: Higher value -> more forgiving for map errors
     # motion model dispersion constants
-    motion_dispersion_x: 0.05
+    motion_dispersion_x: 0.5 #default 0.05
     motion_dispersion_y: 0.025
     motion_dispersion_theta: 0.25
     # sensor model variant, variant 2 good for rmgpu, 3 doesn't work for rmgpu
