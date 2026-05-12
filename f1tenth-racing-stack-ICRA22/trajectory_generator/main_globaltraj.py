@@ -268,6 +268,7 @@ reftrack_interp, normvec_normalized_interp, a_interp, coeffs_x_interp, coeffs_y_
 
 # if reoptimization of mintime solution is used afterwards we have to consider some additional deviation in the first
 # optimization
+print("BEVORE OPTIMIZATION")
 if opt_type == 'mintime' and mintime_opts["reopt_mintime_solution"]:
     w_veh_tmp = pars["optim_opts"]["width_opt"] + (pars["optim_opts"]["w_tr_reopt"] - pars["optim_opts"]["w_veh_reopt"])
     w_veh_tmp += pars["optim_opts"]["w_add_spl_regr"]
