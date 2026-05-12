@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import csv
 import yaml
 import os
+from pathlib import Path
 
 WIDTH = 0.2032  # (m)
 WHEEL_LENGTH = 0.0381  # (m)
@@ -107,6 +108,10 @@ def save_csv(data, csv_name, header=None):
 if __name__ == "__main__":
     # Read configuration
     module = os.path.dirname(os.path.abspath(__file__))
+    
+    script_dir = Path(__file__).resolve().parent
+    repo_root = str(script_dir.parents[1])   # two levels above this file
+    
     config_file = module + "/config/params.yaml"
     with open(config_file, 'r') as stream:
         parsed_yaml = yaml.safe_load(stream)
@@ -119,7 +124,7 @@ if __name__ == "__main__":
     opp_safe_dist = parsed_yaml["opp_safe_dist"]
 
     # Read map params
-    yaml_file = module + "/maps/" + input_map + ".yaml"
+    yaml_file = repo_root + "/launch_orchestrator/maps/" + input_map + ".yaml"
     with open(yaml_file, 'r') as stream:
         parsed_yaml = yaml.safe_load(stream)
     scale = parsed_yaml["resolution"]
@@ -132,7 +137,7 @@ if __name__ == "__main__":
         lane_ratios = np.append(lane_ratios, 1.0)
 
     # Read image
-    img_path = module + "/maps/" + input_map + input_map_ext
+    img_path = repo_root + "/launch_orchestrator/maps/" + input_map + input_map_ext
     input_img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     h, w = input_img.shape[:2]
 

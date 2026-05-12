@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 # from matplotlib.colors import LinearSegmentedColormap, Normalize
 import numpy as np
 from copy import deepcopy
+from pathlib import Path
 
 import numpy.linalg as LA
 # import seaborn as sns
@@ -19,8 +20,12 @@ with open(config_file, 'r') as stream:
 input_map = parsed_yaml["map_name"]
 input_map_ext = parsed_yaml["map_img_ext"]
 
-cur_map_path = os.path.join(module, 'maps', input_map + input_map_ext)
-src_map_path = os.path.join(os.path.split(module)[0], 'maps', input_map + input_map_ext)
+
+script_dir = Path(__file__).resolve().parent
+repo_root = str(script_dir.parents[1])   # two levels above this file
+
+cur_map_path = os.path.join(repo_root, "launch_orchestrator", "maps", input_map + input_map_ext)
+src_map_path = cur_map_path
 
 cur_csv_dir = os.path.join(module, 'outputs', input_map)
 src_csv_dir = os.path.join(os.path.split(module)[0], 'csv', input_map)
@@ -30,10 +35,15 @@ globalWpMinInterval = 0.1
 def scale_map(mapname=None, scale_percent=200, backup_exist=True):
     if not mapname:
         mapname = input_map
-    map_path = os.path.join(module, 'maps', input_map + input_map_ext)
-    back_map_path = os.path.join(module, 'maps', input_map + '_backup' + input_map_ext)
+        
+        
+    maps_dir = os.path.join(repo_root, "launch_orchestrator", "maps")
+    map_path = os.path.join(maps_dir, mapname + input_map_ext)
+    back_map_path = os.path.join(maps_dir, mapname + "_backup" + input_map_ext)
+    
     if not backup_exist:
         os.system(f'cp {map_path} {back_map_path}')
+        
     # raw_map = cv2.imread(map_path, cv2.IMREAD_GRAYSCALE)
     raw_map = cv2.imread(back_map_path, cv2.IMREAD_UNCHANGED)
     # scale_percent = 130  # percent of original size
@@ -387,8 +397,16 @@ def visualize_curvature_for_wp(wpfile='lane_optimal.csv', ka_thres=0.05):
     slow_wp = []
     for i in corner_idx:
         slow_wp.append([po[i, 0], po[i, 1]])
-    plt.scatter(np.array(slow_wp)[:, 0], np.array(slow_wp)[:, 1], c='g', label='slowdown_segment', s=5)
-    plt.scatter(np.array(overtake_wp)[:, 0], np.array(overtake_wp)[:, 1], c='r', label='overtaking_segment', s=5)
+        
+    slow_wp = np.array(slow_wp)
+    overtake_wp = np.array(overtake_wp)
+        
+    if len(slow_wp) > 0:
+        plt.scatter(slow_wp[:, 0], slow_wp[:, 1], c='g', label='slowdown_segment', s=5)
+
+    if len(overtake_wp) > 0:
+        plt.scatter(overtake_wp[:, 0], overtake_wp[:, 1], c='r', label='overtaking_segment', s=5)
+    
     plt.axis('equal')
     plt.legend()
 

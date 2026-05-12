@@ -76,3 +76,38 @@ To launch run
 ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
 
+### How to create you very own special perfect raceline
+
+#### Prerequisites
+You need a configured conda environment with python 3.8 !
+You can create one with `conda create -n <my_env_name> python=3.8`
+
+#### Create a new optimal raceline
+(1) make sure your map.pgm and your `map.yaml` is located in `launch_orchestrator/maps`
+
+(2) in `opt_raceline/config/params.yaml` set the map name correct and choose your safety distance
+
+(3) activate the conda env with `conda activate <my_env_name>`
+
+(4) run `python lane_generator.py`
+    you may need to edit the `pgm` map file with a photo editing software to ensure cleanly closed borders !
+
+(5) run `python main_globaltraj.py`
+    you may need to adapt the parameters in `params/rececar.ini` !
+    Especially 
+    # stepsize_prep
+    # stepsize_reg
+    # stepsize_interp_after_opt
+    # k_reg
+    # s_reg
+
+(6) run `python raceline_scripts.py`
+    The optimal raceline is now stored in `outputs/map_name/traj_race_cl.csv` .
+
+
+#### Publish the raceline
+You can start a node that publishes the current raceline stored in `outputs/map_name/traj_race_cl.csv` with
+`ros2 run opt_raceline raceline_csv_publisher`
+
+
+
