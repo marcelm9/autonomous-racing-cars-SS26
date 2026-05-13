@@ -298,7 +298,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.34f, 0.34f); // should be 0.34
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.41f, 0.41f); // should be 0.34
   drive_msg.drive.speed = set_speed;
   drive_speed_pub->publish(drive_msg);
 
@@ -339,55 +339,13 @@ void FollowGap::diag_timer_callback()
   diag_pub->publish(diag_msg);
 }
 
-/*
 void FollowGap::disparity_extender(
     const std::vector<float> &ranges,
     int n_extend,
     float step_depth,
     std::vector<float> &out_extended_ranges
 )
-{
-  int num_lasers = ranges.size();
-  out_extended_ranges = ranges;
-
-  for (int i = 0; i < num_lasers; i++)
   {
-    float current = ranges[i];
-    if (!std::isfinite(current)) continue;
-
-    // prev calculation: min of ranges[i-n_extend ... i-1]
-    float prev = std::numeric_limits<float>::infinity();
-    for (int j = std::max(0, i - n_extend); j < i; j++) {
-        if (std::isfinite(ranges[j])) prev = std::min(prev, ranges[j]);
-    }
-
-    // next calculation: min of ranges[i+1 ... i+n_extend]
-    float next = std::numeric_limits<float>::infinity();
-    for (int j = i + 1; j <= std::min(num_lasers - 1, i + n_extend); j++) {
-        if (std::isfinite(ranges[j])) next = std::min(next, ranges[j]);
-    }
-
-    if (std::isfinite(prev) && (current - prev > step_depth)) 
-    {
-      out_extended_ranges[i] = std::min(out_extended_ranges[i], prev);
-      std::cout << "extended at " << i << " prev: " << prev << " current: " << current << std::endl;
-    }
-    
-    if (std::isfinite(next) && (current - next > step_depth)) 
-    {
-      out_extended_ranges[i] = std::min(out_extended_ranges[i], next);
-      std::cout << "extended at " << i << " next: " << next << " current: " << current << std::endl;
-    }
-  }
-}
-*/
-void FollowGap::disparity_extender(
-    const std::vector<float> &ranges,
-    int n_extend,
-    float step_depth,
-    std::vector<float> &out_extended_ranges
-)
-{
   int num_lasers = ranges.size();
   out_extended_ranges = ranges; // Initialize with original ranges
 
