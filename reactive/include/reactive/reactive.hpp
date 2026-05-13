@@ -89,18 +89,28 @@ private:
 
     // subscribers
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
 
     // publishers
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
-
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr oh_no_im_stuck_publisher;
 
     // methods
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
+    void path_callback(const nav_msgs::msg::Path::ConstSharedPtr path_msg);
+    void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_msg);
     // int main(int argc, char ** argv);
 
     void visualize_lidar_ranges();
+
+    void disparity_extender(
+        const std::vector<float> &ranges,
+        int n_extend,
+        float step_depth,
+        std::vector<float> &out_extended_ranges
+    )
 
     void find_gaps_by_threshold(
         const std::vector<float> &ranges,

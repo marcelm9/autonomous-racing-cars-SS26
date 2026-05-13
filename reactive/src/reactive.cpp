@@ -4,6 +4,8 @@ FollowGap::FollowGap() : Node("reactive")
 {
   /* ---- subscribers ---- */
   scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
+  path_sub = this->create_subscription<nav_msgs::msg::Path>("/path", 10, std::bind(&FollowGap::path_callback, this, std::placeholders::_1));
+  odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&FollowGap::odom_callback, this, std::placeholders::_1));
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
@@ -301,6 +303,50 @@ void FollowGap::diag_timer_callback()
 
   diag_msg.status.push_back(status);
   diag_pub->publish(diag_msg);
+}
+
+void FollowGap::disparity_extender(
+    const std::vector<float> &ranges,
+    int n_extend,
+    int step_depth,
+    std::vector<float> &out_extended_ranges
+)
+{
+  // extend edges of obstacles or corners so car doesnt clip the edges
+  
+  int num_lasers = ranges.size();
+  out_extended_ranges = ranges; // start with original ranges
+
+  // left to right
+  for(i=0; i<num_lasers-1; i++)
+  {
+    // define which rays should be considered for extension
+    float current = ranges[i];
+    float prev = std::min(ranges[i-std::min(i, n_extend)], ranges[i-1]);
+    float next = std::min(ranges[i+std::min(num_lasers-1-i, n_extend)], ranges[i+1]);
+
+    if (std::isfinite(current) && std::isfinite(next) && std::isfinite(prev))
+    {
+      float diff_to_prev = current - prev;
+      float diff_to_next = current - next;
+
+      // detected an obstacle to the left
+      if (diff_to_prev > step_depth) 
+      {
+        // extend the edge
+        out_extended_ranges[i] = prev;
+        
+      }
+      
+      // detected an obstacle to the right
+      if (diff_to_next > step_depth) 
+      {
+        // extend the edge
+        out_extended_ranges[i] = next;
+        
+      }
+    }
+  }
 }
 
 void FollowGap::find_gaps_by_threshold(
