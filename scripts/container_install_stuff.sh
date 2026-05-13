@@ -4,7 +4,7 @@
 
 yes | sudo apt install vim
 echo """
-alias src=\"source /opt/ros/jazzy/setup.bash && source /arc2026/ws/install/setup.bash\"
+alias src=\"source /opt/ros/jazzy/setup.bash && source /arc2026/ws/install/setup.bash\ && echo Built and sourced\"
 alias cb=\"colcon build && src\"
 """ > ~/.bashrc
 pip install scikit-image --break-system-packages
