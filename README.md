@@ -82,11 +82,7 @@ To launch run
 ### Launch crp_launch Arguments
 ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
-<<<<<<< HEAD
-# Roxglove Setup
-=======
 # Foxglove Setup
->>>>>>> feature/multi-agent
 im Container installieren:
 
 sudo apt update
@@ -101,8 +97,6 @@ in VS Code neben dem Terminal bei Ports 8765 hinzufügen
 
 Bei Foxglove anmelden: studio.foxglove.dev
 configs finden sich in configs/foxglove
-<<<<<<< HEAD
-=======
 
 # Tunable Parameters
 
@@ -114,7 +108,6 @@ in der .cpp:
         this->declare_parameter<double>("max_speed", 20.0);
     im callback:
         this->get_parameter("max_speed", this->MAXDRIVESPEED);
->>>>>>> feature/multi-agent
 
 # git naming convention
 
