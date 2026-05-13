@@ -4,7 +4,8 @@
 
 yes | sudo apt install vim
 echo """
-alias cb=\"colcon build\"
 alias src=\"source /opt/ros/jazzy/setup.bash && source /arc2026/ws/install/setup.bash\"
+alias cb=\"colcon build && src\"
 """ > ~/.bashrc
+pip install scikit-image --break-system-packages
 echo -e "\nRestart this terminal to activate the aliases, or run 'source ~/.bashrc' to activate them immediately.\n"
