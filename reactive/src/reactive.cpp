@@ -358,12 +358,15 @@ void FollowGap::disparity_extender(
     // Skip if either ray is invalid
     if (!std::isfinite(r1) || !std::isfinite(r2)) continue;
 
-    // Check if the jump between ADJACENT rays is larger than the threshold
+    // Check if the jump between adjacant rays is larger than the threshold
     if (std::abs(r1 - r2) > step_depth)
     {
       if (r1 < r2)
       {
         // r1 is the closer point (obstacle edge). Extend r1 into the r2 (gap) side.
+        // change the n_extend depending on the distance to the obstacle
+        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
+        n_extend = std::max(5, n_extend);
         // Overwrite the next 'n_extend' indices to the right.
         for (int j = i + 1; j <= std::min(num_lasers - 1, i + n_extend); j++)
         {
@@ -373,6 +376,9 @@ void FollowGap::disparity_extender(
       else
       {
         // r2 is the closer point. Extend r2 into the r1 side.
+        // change the n_extend depending on the distance to the obstacle
+        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
+        n_extend = std::max(5, n_extend);
         // Overwrite the previous 'n_extend' indices to the left.
         for (int j = i; j >= std::max(0, i + 1 - n_extend); j--)
         {
