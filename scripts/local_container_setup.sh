@@ -12,6 +12,7 @@ cat << 'EOF' >> ~/.bashrc
 PS1="\[\e[1;36m\]ros\[\e[0m\]@\[\e[1;32m\]\h\[\e[0m\]:\w\$ "
 alias src="source /opt/ros/jazzy/setup.bash && source /arc2026/ws/install/setup.bash && echo 'Sourced'"
 alias cb="colcon build && src && echo 'Built and sourced'"
+alias foxglove="ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765"
 EOF
 
 # skimage
