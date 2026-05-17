@@ -137,4 +137,8 @@ dmypy.json
 .idea
 
 # repo specific
+outputs/*
+!outputs/
+!outputs/crazy_map/
+!outputs/crazy_map/traj_race_cl.csv
 outputs

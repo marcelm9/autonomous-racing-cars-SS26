@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
+import csv
 import math
 from pathlib import Path
-
-import numpy as np
 
 import rclpy
 from rclpy.node import Node
@@ -12,6 +11,20 @@ from msgs.msg import Raceline, RacelinePoint
 
 from nav_msgs.msg import Path as PathMsg
 from geometry_msgs.msg import PoseStamped
+
+
+DEFAULT_RACELINE_PATH = (
+    "opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv"
+)
+REQUIRED_COLUMNS = (
+    "s_m",
+    "x_m",
+    "y_m",
+    "psi_rad",
+    "kappa_radpm",
+    "vx_mps",
+    "ax_mps2",
+)
 
 
 def yaw_to_quaternion(yaw: float):
@@ -26,12 +39,12 @@ class RacelineCsvPublisher(Node):
 
         self.declare_parameter(
             "csv_path",
-            "/arc2026/ws/src/your_code/opt_raceline/opt_raceline_python/outputs/crazy_map/traj_race_cl.csv",
+            DEFAULT_RACELINE_PATH,
         )
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
 
-        self.csv_path = self.get_parameter("csv_path").value
+        self.csv_path = self.resolve_csv_path(self.get_parameter("csv_path").value)
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
 
@@ -47,54 +60,116 @@ class RacelineCsvPublisher(Node):
             10,
         )
 
-        self.raceline_msg = self.load_raceline_csv(self.csv_path)
-        self.path_msg = self.create_path_msg(self.raceline_msg)
+        try:
+            self.raceline_msg = self.load_raceline_csv(self.csv_path)
+            self.path_msg = self.create_path_msg(self.raceline_msg)
+        except Exception as exc:
+            self.get_logger().error(
+                f"Failed to load raceline CSV '{self.csv_path}': {exc}"
+            )
+            self.raceline_msg = Raceline()
+            self.raceline_msg.header.frame_id = self.frame_id
+            self.path_msg = PathMsg()
+            self.path_msg.header.frame_id = self.frame_id
 
         self.timer = self.create_timer(
             1.0 / self.publish_rate,
             self.publish,
         )
 
-        self.get_logger().info(f"Loaded raceline CSV: {self.csv_path}")
+        if self.raceline_msg.points:
+            self.get_logger().info(f"Loaded raceline CSV: {self.csv_path}")
         self.get_logger().info(f"Number of raceline points: {len(self.raceline_msg.points)}")
         self.get_logger().info("Publishing:")
         self.get_logger().info("  /raceline/trajectory  msgs/msg/Raceline")
         self.get_logger().info("  /raceline/path        nav_msgs/msg/Path")
 
+    def resolve_csv_path(self, csv_path: str) -> str:
+        path = Path(csv_path)
+        candidates = [
+            path,
+            Path.cwd() / path,
+            Path("/arc2026/ws/src/your_code/arc_riders") / path,
+        ]
+
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+
+        return csv_path
+
     def load_raceline_csv(self, csv_path: str) -> Raceline:
         path = Path(csv_path)
-
         if not path.exists():
             raise FileNotFoundError(f"Raceline CSV does not exist: {csv_path}")
 
-        data = np.loadtxt(
-            str(path),
-            delimiter=";",
-            comments="#",
-        )
+        header = None
+        rows = []
+        with path.open(newline="") as csv_file:
+            for line_number, raw_line in enumerate(csv_file, start=1):
+                stripped = raw_line.strip()
+                if not stripped:
+                    continue
 
-        if data.ndim == 1:
-            data = data.reshape(1, -1)
+                if stripped.startswith("#"):
+                    maybe_header = next(csv.reader([stripped[1:].strip()], delimiter=";"))
+                    maybe_header = [field.strip() for field in maybe_header]
+                    if "s_m" in maybe_header and "x_m" in maybe_header and "y_m" in maybe_header:
+                        header = maybe_header
+                    continue
 
-        if data.shape[1] < 7:
-            raise ValueError(
-                f"Expected CSV with 7 columns: "
-                f"s_m; x_m; y_m; psi_rad; kappa_radpm; vx_mps; ax_mps2. "
-                f"Got {data.shape[1]} columns."
-            )
+                fields = next(csv.reader([stripped], delimiter=";"))
+                fields = [field.strip() for field in fields]
+
+                if header is None and "s_m" in fields and "x_m" in fields and "y_m" in fields:
+                    header = fields
+                    continue
+
+                if header is None:
+                    if len(fields) < len(REQUIRED_COLUMNS):
+                        raise ValueError(
+                            f"Line {line_number}: expected at least "
+                            f"{len(REQUIRED_COLUMNS)} semicolon-separated columns."
+                        )
+                    header = list(REQUIRED_COLUMNS)
+
+                column_index = {name: index for index, name in enumerate(header)}
+                missing = [name for name in REQUIRED_COLUMNS if name not in column_index]
+                if missing:
+                    raise ValueError(
+                        f"Raceline CSV is missing required columns: {', '.join(missing)}"
+                    )
+
+                try:
+                    rows.append(
+                        {
+                            name: float(fields[column_index[name]])
+                            for name in REQUIRED_COLUMNS
+                        }
+                    )
+                except (IndexError, ValueError) as exc:
+                    raise ValueError(
+                        f"Line {line_number}: malformed raceline row."
+                    ) from exc
+
+        if not rows:
+            raise ValueError(f"Raceline CSV contains no data rows: {csv_path}")
+        for previous, current in zip(rows, rows[1:]):
+            if current["s_m"] <= previous["s_m"]:
+                raise ValueError("Raceline CSV s_m column must be strictly increasing.")
 
         msg = Raceline()
         msg.header.frame_id = self.frame_id
 
-        for row in data:
+        for row in rows:
             point = RacelinePoint()
-            point.s_m = float(row[0])
-            point.x_m = float(row[1])
-            point.y_m = float(row[2])
-            point.psi_rad = float(row[3])
-            point.kappa_radpm = float(row[4])
-            point.vx_mps = float(row[5])
-            point.ax_mps2 = float(row[6])
+            point.s_m = row["s_m"]
+            point.x_m = row["x_m"]
+            point.y_m = row["y_m"]
+            point.psi_rad = row["psi_rad"]
+            point.kappa_radpm = row["kappa_radpm"]
+            point.vx_mps = row["vx_mps"]
+            point.ax_mps2 = row["ax_mps2"]
 
             msg.points.append(point)
 
