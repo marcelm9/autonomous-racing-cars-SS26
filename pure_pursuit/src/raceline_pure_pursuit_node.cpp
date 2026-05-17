@@ -199,7 +199,9 @@ private:
 
     geometry_msgs::msg::PointStamped goal_map;
     goal_map.header.frame_id = map_frame_;
-    goal_map.header.stamp = this->now();
+    // Use latest available TF for the control transform. Stamping with now()
+    // can be a few milliseconds ahead of the newest simulator TF sample.
+    goal_map.header.stamp = rclcpp::Time(0, 0, this->get_clock()->get_clock_type()).to_msg();
     goal_map.point.x = raceline_[goal_index].x_m;
     goal_map.point.y = raceline_[goal_index].y_m;
     goal_map.point.z = 0.0;
@@ -214,6 +216,7 @@ private:
       publishRacelinePath();
       return;
     }
+    goal_map.header.stamp = this->now();
 
     const double steering_angle = pure_pursuit::computePurePursuitSteering(
       goal_base.point.x,
