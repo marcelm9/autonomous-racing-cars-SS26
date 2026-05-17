@@ -201,7 +201,8 @@ private:
     goal_map.header.frame_id = map_frame_;
     // Use latest available TF for the control transform. Stamping with now()
     // can be a few milliseconds ahead of the newest simulator TF sample.
-    goal_map.header.stamp = rclcpp::Time(0, 0, this->get_clock()->get_clock_type()).to_msg();
+    goal_map.header.stamp.sec = 0;
+    goal_map.header.stamp.nanosec = 0;
     goal_map.point.x = raceline_[goal_index].x_m;
     goal_map.point.y = raceline_[goal_index].y_m;
     goal_map.point.z = 0.0;
