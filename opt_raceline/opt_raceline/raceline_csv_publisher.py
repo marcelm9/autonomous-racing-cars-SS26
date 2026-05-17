@@ -26,7 +26,7 @@ class RacelineCsvPublisher(Node):
 
         self.declare_parameter(
             "csv_path",
-            "/arc2026/ws/src/your_code/opt_raceline/opt_raceline_python/outputs/crazy_map/traj_race_cl.csv",
+            "/arc2026/ws/src/your_code/arc_riders/opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
         )
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
