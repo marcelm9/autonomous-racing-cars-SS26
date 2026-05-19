@@ -4,6 +4,8 @@ FollowGap::FollowGap() : Node("reactive")
 {
   /* ---- subscribers ---- */
   scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
+  path_sub = this->create_subscription<nav_msgs::msg::Path>("/path", 10, std::bind(&FollowGap::path_callback, this, std::placeholders::_1));
+  odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&FollowGap::odom_callback, this, std::placeholders::_1));
 
   /* ---- publishers ---- */
   drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
@@ -17,18 +19,55 @@ FollowGap::FollowGap() : Node("reactive")
       std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
+  this->declare_parameter<double>("max_speed", 3.0);
+  this->declare_parameter<int>("reac_n_extend", 15);
+  this->declare_parameter<double>("reac_step_depth", 0.1);
 }
 
 /* ---- CALLBACKS ---- */
+
+void FollowGap::path_callback(const nav_msgs::msg::Path::ConstSharedPtr path_msg)
+{
+  this->path_msg = *path_msg;
+}
+
+void FollowGap::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_msg)
+{
+  this->odom_msg = *odom_msg;
+}
+
+void FollowGap::parameter_callback(const std::vector<std::string> &changed_parameters)
+{
+    for (const auto & param_name : changed_parameters) {
+        if (param_name == "max_speed") {
+            this->get_parameter("max_speed", this->MAXDRIVESPEED);
+        }
+        if (param_name == "reac_n_extend") {
+            this->get_parameter("reac_n_extend", this->n_extend);
+        }
+        if (param_name == "reac_step_depth") {
+            this->get_parameter("reac_step_depth", this->step_depth);
+        }
+    }
+}
 
 void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg)
 {
   this->scan_msg = *scan_msg;
 
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("reac_n_extend", this->n_extend);
+  this->get_parameter("reac_step_depth", this->step_depth);
+
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
 
   std::vector<float> ranges = scan_msg->ranges;
+
+  //// DISPARITY EXTENSION ////
+
+  std::vector<float> extended_ranges;
+  this->disparity_extender(ranges, this->n_extend, this->step_depth, extended_ranges);
 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
@@ -36,7 +75,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
   {
     double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
-    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
+    this->find_gaps_by_threshold(extended_ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty())
     {
       this->diag_active_threshold = threshold; // Save for diagnostics
@@ -224,10 +263,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // set final goal angle 
-  goal_angle = (goal_angle - correction_left + correction_right)/1.5;
+  goal_angle = (goal_angle - correction_left + correction_right);
 
 
   //// SPEED ////
+
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
+
   // Set the speed depending on the open space in front of the car
   min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_front;
@@ -256,7 +298,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   ackermann_msgs::msg::AckermannDriveStamped drive_msg;
 
-  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.2f, 0.2f); // should be 0.34
+  drive_msg.drive.steering_angle = std::clamp(static_cast<float>(this->goal_angle), -0.41f, 0.41f); // should be 0.34
   drive_msg.drive.speed = set_speed;
   drive_speed_pub->publish(drive_msg);
 
@@ -295,6 +337,56 @@ void FollowGap::diag_timer_callback()
 
   diag_msg.status.push_back(status);
   diag_pub->publish(diag_msg);
+}
+
+void FollowGap::disparity_extender(
+    const std::vector<float> &ranges,
+    int n_extend,
+    float step_depth,
+    std::vector<float> &out_extended_ranges
+)
+  {
+  int num_lasers = ranges.size();
+  out_extended_ranges = ranges; // Initialize with original ranges
+
+  // Iterate through adjacent pairs of rays
+  for (int i = 0; i < num_lasers - 1; i++)
+  {
+    float r1 = ranges[i];
+    float r2 = ranges[i + 1];
+
+    // Skip if either ray is invalid
+    if (!std::isfinite(r1) || !std::isfinite(r2)) continue;
+
+    // Check if the jump between adjacant rays is larger than the threshold
+    if (std::abs(r1 - r2) > step_depth)
+    {
+      if (r1 < r2)
+      {
+        // r1 is the closer point (obstacle edge). Extend r1 into the r2 (gap) side.
+        // change the n_extend depending on the distance to the obstacle
+        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
+        n_extend = std::max(5, n_extend);
+        // Overwrite the next 'n_extend' indices to the right.
+        for (int j = i + 1; j <= std::min(num_lasers - 1, i + n_extend); j++)
+        {
+          out_extended_ranges[j] = std::min(out_extended_ranges[j], r1);
+        }
+      }
+      else
+      {
+        // r2 is the closer point. Extend r2 into the r1 side.
+        // change the n_extend depending on the distance to the obstacle
+        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
+        n_extend = std::max(5, n_extend);
+        // Overwrite the previous 'n_extend' indices to the left.
+        for (int j = i; j >= std::max(0, i + 1 - n_extend); j--)
+        {
+          out_extended_ranges[j] = std::min(out_extended_ranges[j], r2);
+        }
+      }
+    }
+  }
 }
 
 void FollowGap::find_gaps_by_threshold(

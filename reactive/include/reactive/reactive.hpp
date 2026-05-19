@@ -8,6 +8,8 @@
 /// CHECK: include needed ROS msg type headers and libraries
 #include "sensor_msgs/msg/laser_scan.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include "std_msgs/msg/string.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include "visualization_msgs/msg/marker.hpp"
@@ -35,13 +37,13 @@ public:
 private:
     // PARAMETERS
     int SAFETYBUBBLE = 2; //
-    double MAXDRIVESPEED = 20;
-    double BRAKE_TUNE = 0.075; // higher --> brake later
+    double MAXDRIVESPEED = 3.0;
+    double BRAKE_TUNE = 0.1; //0.075; // higher --> brake later
 
     float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t n_gaphits = 30; // Need at least
+    size_t n_gaphits = 20; // Need at least
 
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
     double MAX_DIST_STEER = 1;
@@ -49,6 +51,9 @@ private:
     double SIGMA_FRONT = 2.4;
     double SIGMA_SIDE = 0.2;
     double SIGMA_AMPLITUDE = 0.4;
+
+    int n_extend = 15; // how many rays should be extended on each side of a detected gap edge in the disparity extender
+    double step_depth = 0.1;
 
     
     /* ---- Diagnostics ---- */
@@ -86,21 +91,34 @@ private:
     bool oh_no_im_stuck = false;
 
     sensor_msgs::msg::LaserScan scan_msg;
+    nav_msgs::msg::Path path_msg;
+    nav_msgs::msg::Odometry odom_msg;
 
     // subscribers
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub;
+    rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub;
 
     // publishers
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_speed_pub;
-
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr gap_publisher;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr oh_no_im_stuck_publisher;
 
     // methods
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
+    void path_callback(const nav_msgs::msg::Path::ConstSharedPtr path_msg);
+    void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_msg);
     // int main(int argc, char ** argv);
+    void parameter_callback(const std::vector<std::string> &changed_parameters);
 
     void visualize_lidar_ranges();
+
+    void disparity_extender(
+        const std::vector<float> &ranges,
+        int n_extend,
+        float step_depth,
+        std::vector<float> &out_extended_ranges
+    );
 
     void find_gaps_by_threshold(
         const std::vector<float> &ranges,

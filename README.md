@@ -27,6 +27,13 @@
 ### Launch reactive node
 `ros2 launch reactive reactive_launch.py`
 
+## Launch reactive node in multi agent scenario
+1) `ros2 launch reactive reactive_launch.py`
+2) new console, source
+3) `ros2 launch reactive reactive_launch.py scan_topic:=/opp_scan odom_topic:=/opp_racecar/odom drive_topic:=/opp_drive use_sim:=false`
+
+
+
 ### Launch reactive and safety node
 `ros2 launch launch_orchestrator safe_reactive_launch.py`
 
@@ -75,6 +82,43 @@ To launch run
 ### Launch crp_launch Arguments
 ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
+# Foxglove Setup
+im Container installieren:
+
+sudo apt update
+sudo apt install ros-jazzy-foxglove-bridge
+
+diese node muss im Hintergrund laufen:
+
+ros2 run foxglove_bridge foxglove_bridge
+
+Port 8765 nach außen legen:
+in VS Code neben dem Terminal bei Ports 8765 hinzufügen
+
+Bei Foxglove anmelden: studio.foxglove.dev
+configs finden sich in configs/foxglove
+
+# Tunable Parameters
+
+in der .hpp als Parameter definieren:
+double MAXDRIVESPEED;
+
+in der .cpp:
+    FollowGap::FollowGap() : Node("reactive")
+        this->declare_parameter<double>("max_speed", 20.0);
+    im callback:
+        this->get_parameter("max_speed", this->MAXDRIVESPEED);
+
+# git naming convention
+
+branches:
+- feature/...
+- bugfix/...
+
+commits:
+- added ...
+- removed ...
+- changed ...
 
 ### How to create you very own special perfect raceline
 
