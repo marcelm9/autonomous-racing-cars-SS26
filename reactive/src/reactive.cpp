@@ -561,7 +561,7 @@ void FollowGap::visualize_lidar_ranges()
 
   // visualize the gaussian bell used for correction as an ellipse
   visualization_msgs::msg::Marker ellipse_marker;
-  ellipse_marker.header.frame_id = "ego_racecar/laser";
+  ellipse_marker.header.frame_id = this->scan_msg.header.frame_id;
   ellipse_marker.header.stamp = this->get_clock()->now();
   ellipse_marker.ns = "gaussian_ellipse";
   ellipse_marker.id = 999; 
@@ -609,7 +609,7 @@ visualization_msgs::msg::Marker FollowGap::create_marker(double x, double y, dou
   // create message
   visualization_msgs::msg::Marker marker;
 
-  marker.header.frame_id = "ego_racecar/laser";
+  marker.header.frame_id = this->scan_msg.header.frame_id;
   marker.header.stamp = rclcpp::Clock().now();
 
   marker.ns = "basic_shapes";
@@ -643,7 +643,7 @@ visualization_msgs::msg::Marker FollowGap::create_line_marker(double x1, double 
 {
   visualization_msgs::msg::Marker marker;
 
-  marker.header.frame_id = "ego_racecar/laser";
+  marker.header.frame_id = this->scan_msg.header.frame_id;
   marker.header.stamp = this->get_clock()->now();
 
   marker.ns = "lines";
