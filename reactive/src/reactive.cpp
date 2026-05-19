@@ -62,12 +62,19 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
 
-  std::vector<float> ranges = scan_msg->ranges;
+  std::vector<float> raw_ranges = scan_msg->ranges;
+  
+  // 1. Preprocess: Handle NaN/Inf and apply Median Filter
+  std::vector<float> ranges_cleaned;
+  for (float r : raw_ranges) {
+    ranges_cleaned.push_back(std::isfinite(r) ? r : scan_msg->range_max);
+  }
+  std::vector<float> ranges_smoothed = this->preprocess_scan(ranges_cleaned);
 
   //// DISPARITY EXTENSION ////
 
   std::vector<float> extended_ranges;
-  this->disparity_extender(ranges, this->n_extend, this->step_depth, extended_ranges);
+  this->disparity_extender(ranges_smoothed, this->n_extend, this->step_depth, extended_ranges);
 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
@@ -87,11 +94,45 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->gap_angles = gap_angles;
 
   //// STEERING WITH WALL AVOIDANCE////
-  // Steer to middle of gap
+  // Steer to best gap using continuity scoring
 
-  if (!gap_angles.empty())
+  if (!all_gaps.empty())
   {
-    this->goal_angle = gap_angles[gap_angles.size() / 2];
+    double best_score = -std::numeric_limits<double>::infinity();
+    double best_angle = 0.0;
+
+    for (const auto& gap : all_gaps) {
+      if (gap.empty()) continue;
+
+      // 1. Calculate representative depth (average of top X%)
+      std::vector<double> gap_dists;
+      for (double angle : gap) {
+        int idx = static_cast<int>((angle - angle_min) / angle_increment);
+        gap_dists.push_back(extended_ranges[idx]);
+      }
+      std::sort(gap_dists.begin(), gap_dists.end(), std::greater<double>());
+      
+      int num_top = std::max(1, static_cast<int>(gap_dists.size() * this->TOP_PERCENTAGE));
+      double avg_dist = 0;
+      for (int j = 0; j < num_top; ++j) avg_dist += gap_dists[j];
+      avg_dist /= num_top;
+
+      // 2. Calculate center angle of the gap
+      double gap_angle = gap[gap.size() / 2];
+
+      // 3. Continuity Scoring
+      double angle_diff = std::abs(gap_angle - this->last_goal_angle);
+      double score = avg_dist - (angle_diff * this->CONTINUITY_WEIGHT);
+
+      if (score > best_score) {
+        best_score = score;
+        best_angle = gap_angle;
+      }
+    }
+
+    this->goal_angle = best_angle;
+    this->last_goal_angle = best_angle;
+
     if (oh_no_im_stuck)
     {
       auto message = std_msgs::msg::String();
@@ -115,9 +156,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->goal_angle = 0;
   }
 
-
-
-  int num_lasers = ranges.size();
+  std::vector<float> &ranges = ranges_smoothed; // use smoothed ranges for wall avoidance
   double min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_right = -1;
   int idx_closest_left = -1;
@@ -148,6 +187,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // only consider rays outside of the gap if a valid gap was found
   bool use_gap_bounds = (gap_start_idx >= 0 && gap_end_idx >= 0 && gap_start_idx < gap_end_idx); 
   int right_start = 0;
+  int num_lasers = ranges.size();
   int right_end = use_gap_bounds ? gap_start_idx - 1 : num_lasers / 2 - 1;
   int left_start = use_gap_bounds ? gap_end_idx + 1 : num_lasers / 2;
   int left_end = num_lasers - 1;
@@ -337,6 +377,25 @@ void FollowGap::diag_timer_callback()
 
   diag_msg.status.push_back(status);
   diag_pub->publish(diag_msg);
+}
+
+std::vector<float> FollowGap::preprocess_scan(const std::vector<float> &ranges)
+{
+    if (this->FILTER_WINDOW_SIZE <= 1) return ranges;
+
+    std::vector<float> smoothed = ranges;
+    int half = this->FILTER_WINDOW_SIZE / 2;
+    int n = ranges.size();
+
+    for (int i = 0; i < n; ++i) {
+        std::vector<float> window;
+        for (int j = std::max(0, i - half); j <= std::min(n - 1, i + half); ++j) {
+            window.push_back(ranges[j]);
+        }
+        std::sort(window.begin(), window.end());
+        smoothed[i] = window[window.size() / 2];
+    }
+    return smoothed;
 }
 
 void FollowGap::disparity_extender(

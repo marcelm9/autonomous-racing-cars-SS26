@@ -55,6 +55,11 @@ private:
     int n_extend = 15; // how many rays should be extended on each side of a detected gap edge in the disparity extender
     double step_depth = 0.1;
 
+    // ---- New Parameters for Stability ----
+    int FILTER_WINDOW_SIZE = 5;      // Median filter size
+    double CONTINUITY_WEIGHT = 0.5;  // Penalty for steering jumps
+    double TOP_PERCENTAGE = 0.1;     // Furthest rays to average per gap
+
     
     /* ---- Diagnostics ---- */
     rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub;
@@ -72,6 +77,7 @@ private:
 
     // variables
     double goal_angle = 0;
+    double last_goal_angle = 0; // Previous steering target for continuity
     std::vector<double> gap_angles;
     std::vector<std::vector<double>> all_gaps;
 
@@ -112,6 +118,8 @@ private:
     void parameter_callback(const std::vector<std::string> &changed_parameters);
 
     void visualize_lidar_ranges();
+
+    std::vector<float> preprocess_scan(const std::vector<float> &ranges);
 
     void disparity_extender(
         const std::vector<float> &ranges,
