@@ -345,7 +345,7 @@ void FollowGap::disparity_extender(
     float step_depth,
     std::vector<float> &out_extended_ranges
 )
-  {
+{
   int num_lasers = ranges.size();
   out_extended_ranges = ranges; // Initialize with original ranges
 
@@ -358,17 +358,19 @@ void FollowGap::disparity_extender(
     // Skip if either ray is invalid
     if (!std::isfinite(r1) || !std::isfinite(r2)) continue;
 
-    // Check if the jump between adjacant rays is larger than the threshold
+    // Check if the jump between adjacent rays is larger than the threshold
     if (std::abs(r1 - r2) > step_depth)
     {
       if (r1 < r2)
       {
         // r1 is the closer point (obstacle edge). Extend r1 into the r2 (gap) side.
-        // change the n_extend depending on the distance to the obstacle
-        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
-        n_extend = std::max(5, n_extend);
-        // Overwrite the next 'n_extend' indices to the right.
-        for (int j = i + 1; j <= std::min(num_lasers - 1, i + n_extend); j++)
+        // Use a local variable to avoid overwriting the parameter for subsequent obstacles
+        int current_n = n_extend; 
+        
+        // Safety check: as we get closer, the angular width of the car (in indices) should stay similar
+        // or grow to provide a consistent safety buffer. 
+        // Here we use the user-provided n_extend as a base.
+        for (int j = i + 1; j <= std::min(num_lasers - 1, i + current_n); j++)
         {
           out_extended_ranges[j] = std::min(out_extended_ranges[j], r1);
         }
@@ -376,11 +378,10 @@ void FollowGap::disparity_extender(
       else
       {
         // r2 is the closer point. Extend r2 into the r1 side.
-        // change the n_extend depending on the distance to the obstacle
-        n_extend = n_extend - static_cast<int>(std::floor((n_extend/10.0)*r1));
-        n_extend = std::max(5, n_extend);
-        // Overwrite the previous 'n_extend' indices to the left.
-        for (int j = i; j >= std::max(0, i + 1 - n_extend); j--)
+        int current_n = n_extend;
+        
+        // Overwrite the previous 'current_n' indices to the left.
+        for (int j = i; j >= std::max(0, i + 1 - current_n); j--)
         {
           out_extended_ranges[j] = std::min(out_extended_ranges[j], r2);
         }
