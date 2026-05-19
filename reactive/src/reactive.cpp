@@ -437,7 +437,7 @@ void FollowGap::find_gaps_by_threshold(
       // inside a possible gap
       temp_angles.push_back(angle);
       min_count++;
-      longest_ray_in_gap = std::max(longest_ray_in_gap, ranges[k]);
+      longest_ray_in_gap = std::max(longest_ray_in_gap, static_cast<double>(ranges[k]));
     }
     else
     {
