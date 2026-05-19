@@ -364,12 +364,12 @@ void FollowGap::disparity_extender(
       if (r1 < r2)
       {
         // r1 is the closer point (obstacle edge). Extend r1 into the r2 (gap) side.
-        // Use a local variable to avoid overwriting the parameter for subsequent obstacles
-        int current_n = n_extend; 
+        // Linear scaling: Closer obstacles get larger extensions.
+        // At 0m -> 100% of n_extend. At 10m -> 10% of n_extend.
+        double scale = std::max(0.1, 1.0 - (static_cast<double>(r1) / 5.0));
+        int current_n = static_cast<int>(std::floor(n_extend * scale));
+        current_n = std::max(1, current_n); // Ensure at least 1 ray is extended
         
-        // Safety check: as we get closer, the angular width of the car (in indices) should stay similar
-        // or grow to provide a consistent safety buffer. 
-        // Here we use the user-provided n_extend as a base.
         for (int j = i + 1; j <= std::min(num_lasers - 1, i + current_n); j++)
         {
           out_extended_ranges[j] = std::min(out_extended_ranges[j], r1);
@@ -378,7 +378,9 @@ void FollowGap::disparity_extender(
       else
       {
         // r2 is the closer point. Extend r2 into the r1 side.
-        int current_n = n_extend;
+        double scale = std::max(0.1, 1.0 - (static_cast<double>(r2) / 10.0));
+        int current_n = static_cast<int>(std::floor(n_extend * scale));
+        current_n = std::max(1, current_n);
         
         // Overwrite the previous 'current_n' indices to the left.
         for (int j = i; j >= std::max(0, i + 1 - current_n); j--)
