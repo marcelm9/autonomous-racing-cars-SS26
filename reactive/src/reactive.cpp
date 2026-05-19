@@ -408,8 +408,8 @@ void FollowGap::find_gaps_by_threshold(
   size_t min_count = 0;
 
   int num_lasers = ranges.size();
-  double temp_dist_sum = 0;
-  double best_dist_sum = 0;
+  double longest_ray_in_gap = 0.0;
+  double longest_gap = 0.0;
 
   const double MAX_RELEVANT_ANGLE = M_PI_2; // ignore walls behind the car
   const double REAR_CLEARANCE = 0.2;      // ignore obstacles too far behind for a rear tire hit
@@ -437,17 +437,17 @@ void FollowGap::find_gaps_by_threshold(
       // inside a possible gap
       temp_angles.push_back(angle);
       min_count++;
-      temp_dist_sum += ranges[k];
+      longest_ray_in_gap = std::max(longest_ray_in_gap, ranges[k]);
     }
     else
     {
       // end of Gap
 
-      if (min_count > this->n_gaphits && temp_dist_sum > best_dist_sum)
+      if (min_count > this->n_gaphits && longest_ray_in_gap > longest_gap)
       {
         // new best gap
         out_best_gap = temp_angles;
-        best_dist_sum = temp_dist_sum;
+        longest_gap = longest_ray_in_gap;
       }
 
       // safe as a found gap
@@ -457,7 +457,7 @@ void FollowGap::find_gaps_by_threshold(
       // reset temporary values for next gap
       temp_angles.clear();
       min_count = 0;
-      temp_dist_sum = 0.0;
+      longest_ray_in_gap = 0.0;
     }
   }
 
@@ -465,7 +465,7 @@ void FollowGap::find_gaps_by_threshold(
   if (!temp_angles.empty() && min_count > this->n_gaphits)
   {
     out_all_gaps.push_back(temp_angles);
-    if (temp_dist_sum > best_dist_sum)
+    if (longest_ray_in_gap > longest_gap)
     {
       out_best_gap = temp_angles;
     }
