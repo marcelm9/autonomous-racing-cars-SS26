@@ -92,7 +92,7 @@ def generate_launch_description():
                 executable="raceline_pure_pursuit_node",
                 name="raceline_pure_pursuit_node",
                 output="screen",
-                parameters=[defensive],
+                parameters=[aggressive],
                 remappings=[("/drive", "/drive_pp")],
             ),
             Node(

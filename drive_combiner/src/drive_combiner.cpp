@@ -20,7 +20,7 @@ class DriveCombiner : public rclcpp::Node
 public:
     DriveCombiner() : Node("drive_combiner"), current_speed_(0.0), reactive_mode_active_(false)
     {
-        this->declare_parameter<double>("ttc_threshold", 1.0);
+        this->declare_parameter<double>("ttc_threshold", 0.5);
         this->declare_parameter<double>("ttc_cone_width_deg", 10.0);
 
         // subscribers
@@ -49,6 +49,7 @@ public:
 private:
     double current_speed_;
     bool reactive_mode_active_;
+    double last_pp_steering_ = 0.0;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -63,7 +64,7 @@ private:
         current_speed_ = msg->twist.twist.linear.x;
     }
 
-    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg, double cone_center)
     {
         double angle_increment = msg->angle_increment;
         double angle_min = msg->angle_min;
@@ -81,13 +82,15 @@ private:
         {
             double angle = i * angle_increment + angle_min;
 
-            if (angle < -fov_limit || angle > fov_limit)
+            // shift the FOV window by the cone_center
+            if (angle < (cone_center - fov_limit) || angle > (cone_center + fov_limit))
                 continue;
 
             if (std::isnan(ranges[i]) || std::isinf(ranges[i]))
                 continue;
 
-            double projection = std::max(0.0, current_speed_ * std::cos(angle));
+            // project the speed along the intended path, not just straight ahead
+            double projection = std::max(0.0, current_speed_ * std::cos(angle - cone_center));
             float ttc = (projection <= 0.0) ? std::numeric_limits<float>::infinity() : (ranges[i] / projection);
 
             if (ttc < min_TTC)
@@ -141,7 +144,7 @@ private:
         marker_pub_->publish(marker);
     }
 
-    void publish_cone_marker(const std_msgs::msg::Header &header)
+    void publish_cone_marker(const std_msgs::msg::Header &header, double cone_center)
     {
         double cone_width_deg = this->get_parameter("ttc_cone_width_deg").as_double();
         double fov_limit = (cone_width_deg / 2.0) * (M_PI / 180.0);
@@ -150,17 +153,13 @@ private:
         cone.header = header;
         cone.ns = "ttc_cone";
         cone.id = 1;
-
         cone.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
         cone.action = visualization_msgs::msg::Marker::ADD;
-
         cone.scale.x = 1.0;
         cone.scale.y = 1.0;
         cone.scale.z = 1.0;
 
         double visual_length = 3.0;
-
-        // slightly elevate the Z-axis to prevent it from clipping into the floor
         double z_offset = 0.05;
 
         geometry_msgs::msg::Point origin, left_pt, right_pt;
@@ -168,12 +167,13 @@ private:
         origin.y = 0.0;
         origin.z = z_offset;
 
-        left_pt.x = visual_length * std::cos(fov_limit);
-        left_pt.y = visual_length * std::sin(fov_limit);
+        // offset the left and right points by the steering angle
+        left_pt.x = visual_length * std::cos(cone_center + fov_limit);
+        left_pt.y = visual_length * std::sin(cone_center + fov_limit);
         left_pt.z = z_offset;
 
-        right_pt.x = visual_length * std::cos(-fov_limit);
-        right_pt.y = visual_length * std::sin(-fov_limit);
+        right_pt.x = visual_length * std::cos(cone_center - fov_limit);
+        right_pt.y = visual_length * std::sin(cone_center - fov_limit);
         right_pt.z = z_offset;
 
         cone.points.push_back(origin);
@@ -184,23 +184,18 @@ private:
         c.a = 0.5;
         if (reactive_mode_active_)
         {
-            // yellow
             c.r = 1.0;
             c.g = 1.0;
             c.b = 0.0;
         }
         else
         {
-            // green
             c.r = 0.0;
             c.g = 1.0;
             c.b = 0.0;
         }
 
-        // set global color just in case
         cone.color = c;
-
-        // assign the color to EVERY vertex of the triangle individually
         cone.colors.push_back(c);
         cone.colors.push_back(c);
         cone.colors.push_back(c);
@@ -211,7 +206,11 @@ private:
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
-        double min_ttc = calc_min_ttc(msg).min_ttc;
+
+        // if in PP, look where we are steering; if in Reactive, look straight ahead
+        double cone_center = reactive_mode_active_ ? 0.0 : last_pp_steering_;
+
+        double min_ttc = calc_min_ttc(msg, cone_center).min_ttc;
 
         if (min_ttc <= ttc_threshold)
         {
@@ -231,11 +230,13 @@ private:
         }
 
         publish_mode_marker(msg->header.stamp);
-        publish_cone_marker(msg->header);
+        publish_cone_marker(msg->header, cone_center);
     }
 
     void drive_pp_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
     {
+        last_pp_steering_ = msg->drive.steering_angle;
+
         if (!reactive_mode_active_)
         {
             drive_pub_->publish(*msg);
