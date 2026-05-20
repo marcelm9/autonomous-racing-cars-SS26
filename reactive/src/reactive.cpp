@@ -19,9 +19,20 @@ FollowGap::FollowGap() : Node("reactive")
       std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
-  this->declare_parameter<double>("max_speed", 3.0);
-  this->declare_parameter<int>("reac_n_extend", 100);
-  this->declare_parameter<double>("reac_step_depth", 0.5);
+  this->declare_parameter<double>("max_speed", this->MAXDRIVESPEED);
+  this->declare_parameter<int>("reac_n_extend", this->N_EXTEND);
+  this->declare_parameter<double>("reac_step_depth", this->STEP_DEPTH);
+  this->declare_parameter<double>("continuity_weight", this->CONTINUITY_WEIGHT);
+
+  // Initialize from parameters
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("reac_n_extend", this->N_EXTEND);
+  this->get_parameter("reac_step_depth", this->STEP_DEPTH);
+  this->get_parameter("continuity_weight", this->CONTINUITY_WEIGHT);
+
+  // Register the dynamic parameter callback
+  callback_handle_ = this->add_on_set_parameters_callback(
+      std::bind(&FollowGap::parameters_callback, this, std::placeholders::_1));
 }
 
 /* ---- CALLBACKS ---- */
@@ -36,28 +47,35 @@ void FollowGap::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom
   this->odom_msg = *odom_msg;
 }
 
-void FollowGap::parameter_callback(const std::vector<std::string> &changed_parameters)
+rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const std::vector<rclcpp::Parameter> &parameters)
 {
-    for (const auto & param_name : changed_parameters) {
-        if (param_name == "max_speed") {
-            this->get_parameter("max_speed", this->MAXDRIVESPEED);
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    result.reason = "success";
+
+    for (const auto &param : parameters)
+    {
+        if (param.get_name() == "max_speed") {
+            this->MAXDRIVESPEED = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'max_speed' updated to: %.2f", this->MAXDRIVESPEED);
         }
-        if (param_name == "reac_n_extend") {
-            this->get_parameter("reac_n_extend", this->n_extend);
+        else if (param.get_name() == "continuity_weight") {
+            this->CONTINUITY_WEIGHT = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'continuity_weight' updated to: %.2f", this->CONTINUITY_WEIGHT);
         }
-        if (param_name == "reac_step_depth") {
-            this->get_parameter("reac_step_depth", this->step_depth);
+        else if (param.get_name() == "reac_n_extend") {
+            this->n_extend = param.as_int();
+        }
+        else if (param.get_name() == "reac_step_depth") {
+            this->step_depth = param.as_double();
         }
     }
+    return result;
 }
 
 void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg)
 {
   this->scan_msg = *scan_msg;
-
-  this->get_parameter("max_speed", this->MAXDRIVESPEED);
-  this->get_parameter("reac_n_extend", this->n_extend);
-  this->get_parameter("reac_step_depth", this->step_depth);
 
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
@@ -250,7 +268,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->diag_dist_closest_right = this->closest_dist_right;
   } else {
     this->closest_idx_right = -1;
-    this->diag_dist_closest_right = this->MAX_DIST_STEER;
   }
 
   if (idx_closest_left >= 0) {
@@ -260,7 +277,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->diag_dist_closest_left = this->closest_dist_left;
   } else {
     this->closest_idx_left = -1;
-    this->diag_dist_closest_left = this->MAX_DIST_STEER;
   }
 
   this->diag_correction_left = correction_left;
@@ -544,7 +560,7 @@ void FollowGap::find_gaps_by_threshold(
     {
       // end of Gap
 
-      if (min_count > this->n_gaphits && longest_ray_in_gap > longest_gap)
+      if (min_count > this->N_GAP_HITS && longest_ray_in_gap > longest_gap)
       {
         // new best gap
         out_best_gap = temp_angles;
@@ -552,7 +568,7 @@ void FollowGap::find_gaps_by_threshold(
       }
 
       // safe as a found gap
-      if (!temp_angles.empty() && min_count > this->n_gaphits)
+      if (!temp_angles.empty() && min_count > this->N_GAP_HITS)
         out_all_gaps.push_back(temp_angles);
 
       // reset temporary values for next gap
@@ -563,7 +579,7 @@ void FollowGap::find_gaps_by_threshold(
   }
 
   // edge case: scan ends with a gap still "open"
-  if (!temp_angles.empty() && min_count > this->n_gaphits)
+  if (!temp_angles.empty() && min_count > this->N_GAP_HITS)
   {
     out_all_gaps.push_back(temp_angles);
     if (longest_ray_in_gap > longest_gap)

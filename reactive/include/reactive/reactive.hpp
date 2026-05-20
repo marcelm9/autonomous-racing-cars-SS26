@@ -36,26 +36,25 @@ public:
 
 private:
     // PARAMETERS
-    int SAFETYBUBBLE = 2; //
     double MAXDRIVESPEED = 3.0;
     double BRAKE_TUNE = 0.1; //0.075; // higher --> brake later
 
+    // parameters for gap finding
     float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t n_gaphits = 20; // Need at least
-
+    size_t N_GAP_HITS = 20; // Need at least
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
-    double MAX_DIST_STEER = 1;
 
     double SIGMA_FRONT = 2.4;
     double SIGMA_SIDE = 0.2;
     double SIGMA_AMPLITUDE = 0.4;
 
-    int n_extend = 100; // how many rays should be extended on each side of a detected gap edge in the disparity extender
-    double step_depth = 0.5;
+    // parameters for the Disparity Extender
+    int N_EXTEND = 100; // how many rays should be extended 
+    double STEP_DEPTH = 0.5; // how deep the gap must be to be extended
 
-    // ---- New Parameters for Stability ----
+    // parameters for continuity correction
     int FILTER_WINDOW_SIZE = 5;      // Median filter size
     double CONTINUITY_WEIGHT = 0.5;  // Penalty for steering jumps
     double TOP_PERCENTAGE = 0.1;     // Furthest rays to average per gap
@@ -117,8 +116,10 @@ private:
     void scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg);
     void path_callback(const nav_msgs::msg::Path::ConstSharedPtr path_msg);
     void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom_msg);
-    // int main(int argc, char ** argv);
-    void parameter_callback(const std::vector<std::string> &changed_parameters);
+    
+    // Dynamic Parameter Callback
+    OnSetParametersCallbackHandle::SharedPtr callback_handle_;
+    rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> &parameters);
 
     void visualize_lidar_ranges();
 
