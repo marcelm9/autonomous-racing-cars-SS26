@@ -11,13 +11,12 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     raceline_path = LaunchConfiguration("raceline_path")
-    base_frame = LaunchConfiguration("base_frame")
 
     aggressive = {
         "raceline_path": raceline_path,
-        "base_frame": base_frame,
+        "base_frame": "/base_link",
         "drive_topic": "/drive",
-        "odom_topic": "/ego_racecar/odom",
+        "odom_topic": "/odom",
         "min_lookahead": 0.25,
         "max_lookahead": 1.0,
         "lookahead_gain": 0.4,
@@ -31,9 +30,9 @@ def generate_launch_description():
 
     defensive = {
         "raceline_path": raceline_path,
-        "base_frame": base_frame,
+        "base_frame": "/base_link",
         "drive_topic": "/drive",
-        "odom_topic": "/ego_racecar/odom",
+        "odom_topic": "/odom",
         "min_lookahead": 0.25,
         "max_lookahead": 0.5,
         "lookahead_gain": 0.4,
@@ -62,17 +61,12 @@ def generate_launch_description():
                 default_value="opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
                 description="Path to the crazy_map raceline CSV.",
             ),
-            DeclareLaunchArgument(
-                "base_frame",
-                default_value="ego_racecar/base_link",
-                description="Vehicle base frame in the simulator TF tree.",
-            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(
-                        get_package_share_directory("f1tenth_gym_ros"),
+                        get_package_share_directory("f1tenth_stack"),
                         "launch",
-                        "gym_bridge_launch.py",
+                        "bringup_launch.py",
                     )
                 )
             ),
@@ -85,6 +79,19 @@ def generate_launch_description():
                     {
                         "csv_path": raceline_path,
                     }
+                ],
+            ),
+            Node(
+                package="particle_filter",
+                executable="particle_filter",
+                name="particle_filter",
+                output="screen",
+                parameters=[
+                    os.path.join(
+                        get_package_share_directory("particle_filter"),
+                        "config",
+                        "localize.yaml",
+                    )
                 ],
             ),
             Node(
