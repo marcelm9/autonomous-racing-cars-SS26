@@ -245,10 +245,6 @@ private:
                     RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
                 }
             }
-            else
-            {
-                RCLCPP_INFO(this->get_logger(), "SWITCH DENIED (cooldown: %.2f s remaining)", switch_cooldown_seconds - elapsed_seconds);
-            }
         }
 
         publish_mode_marker(msg->header.stamp);
