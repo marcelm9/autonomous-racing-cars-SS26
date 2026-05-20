@@ -29,7 +29,7 @@ class LapTimerNode(Node):
         # 2. Read parameters
         layout_str = self.get_parameter("track_layout").value
         self.frame_id = self.get_parameter("frame_id").value
-        self.odom_topic = self.get_parameter("odom_topic").value
+        self.odom_topic = self.get_parameter("base_frame").value
 
         layout = json.loads(layout_str)
 
