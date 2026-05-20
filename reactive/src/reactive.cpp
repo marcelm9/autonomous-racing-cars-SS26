@@ -64,10 +64,10 @@ rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const st
             RCLCPP_INFO(this->get_logger(), "Parameter 'continuity_weight' updated to: %.2f", this->CONTINUITY_WEIGHT);
         }
         else if (param.get_name() == "reac_n_extend") {
-            this->n_extend = param.as_int();
+            this->N_EXTEND = param.as_int();
         }
         else if (param.get_name() == "reac_step_depth") {
-            this->step_depth = param.as_double();
+            this->STEP_DEPTH = param.as_double();
         }
     }
     return result;
@@ -93,7 +93,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   std::vector<float> extended_ranges;
   std::vector<int> extended_ranges_mask; // 1 if the range was extended to right , 2 if extended to left, 0 if original
-  this->disparity_extender(ranges, this->n_extend, this->step_depth, extended_ranges, extended_ranges_mask);
+  this->disparity_extender(ranges, N_EXTEND, STEP_DEPTH, extended_ranges, extended_ranges_mask);
 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
