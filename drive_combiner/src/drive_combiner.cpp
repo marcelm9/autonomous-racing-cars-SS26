@@ -160,6 +160,7 @@ private:
 
         visualization_msgs::msg::Marker cone;
         cone.header = header;
+        cone.header.frame_id = this->get_parameter("base_frame").as_string();
         cone.ns = "ttc_cone";
         cone.id = 1;
         cone.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
