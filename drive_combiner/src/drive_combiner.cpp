@@ -20,8 +20,14 @@ class DriveCombiner : public rclcpp::Node
 public:
     DriveCombiner() : Node("drive_combiner"), current_speed_(0.0), reactive_mode_active_(false)
     {
-        this->declare_parameter<double>("ttc_threshold", 0.5);
+        // Declare parameters
+        this->declare_parameter<double>("ttc_threshold", 1.0);
         this->declare_parameter<double>("ttc_cone_width_deg", 10.0);
+        this->declare_parameter<std::string>("base_frame", "ego_racecar/base_link"); // ego_racecar/base_link in sim
+        this->declare_parameter<double>("switch_cooldown_seconds", 1.0);
+
+        // Initialize cooldown timer with current time
+        last_switch_time_ = this->now();
 
         // subscribers
         scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -41,15 +47,18 @@ public:
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/mode_marker", 10);
         cone_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/cone_marker", 10);
 
-        RCLCPP_INFO(this->get_logger(), "Drive Combiner Node Started. Threshold ttc: %f, Cone Width: %f deg",
+        RCLCPP_INFO(this->get_logger(), "Drive Combiner Node Started. Threshold ttc: %f, Cone Width: %f deg, Base Frame: %s, Switch Cooldown: %f s",
                     this->get_parameter("ttc_threshold").as_double(),
-                    this->get_parameter("ttc_cone_width_deg").as_double());
+                    this->get_parameter("ttc_cone_width_deg").as_double(),
+                    this->get_parameter("base_frame").as_string().c_str(),
+                    this->get_parameter("switch_cooldown_seconds").as_double());
     }
 
 private:
     double current_speed_;
     bool reactive_mode_active_;
     double last_pp_steering_ = 0.0;
+    rclcpp::Time last_switch_time_;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -105,7 +114,7 @@ private:
     void publish_mode_marker(const builtin_interfaces::msg::Time &stamp)
     {
         visualization_msgs::msg::Marker marker;
-        marker.header.frame_id = "ego_racecar/base_link";
+        marker.header.frame_id = this->get_parameter("base_frame").as_string();
         marker.header.stamp = stamp;
         marker.ns = "drive_mode";
         marker.id = 0;
@@ -206,26 +215,38 @@ private:
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
+        double switch_cooldown_seconds = this->get_parameter("switch_cooldown_seconds").as_double();
+
+        // Calculate time elapsed since our last mode switch
+        rclcpp::Time current_time = this->now();
+        double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
         // if in PP, look where we are steering; if in Reactive, look straight ahead
         double cone_center = reactive_mode_active_ ? 0.0 : last_pp_steering_;
 
         double min_ttc = calc_min_ttc(msg, cone_center).min_ttc;
 
-        if (min_ttc <= ttc_threshold)
+        bool want_reactive_mode = (min_ttc <= ttc_threshold);
+
+        if (want_reactive_mode != reactive_mode_active_)
         {
-            if (!reactive_mode_active_)
+            if (elapsed_seconds >= switch_cooldown_seconds)
             {
-                RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f < %.2f)", min_ttc, ttc_threshold);
-                reactive_mode_active_ = true;
+                reactive_mode_active_ = want_reactive_mode;
+                last_switch_time_ = current_time; // reset cooldown clock
+
+                if (reactive_mode_active_)
+                {
+                    RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f < %.2f)", min_ttc, ttc_threshold);
+                }
+                else
+                {
+                    RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
+                }
             }
-        }
-        else
-        {
-            if (reactive_mode_active_)
+            else
             {
-                RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
-                reactive_mode_active_ = false;
+                RCLCPP_INFO(this->get_logger(), "SWITCH DENIED (cooldown: %.2f s remaining)", switch_cooldown_seconds - elapsed_seconds);
             }
         }
 

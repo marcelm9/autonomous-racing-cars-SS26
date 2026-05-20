@@ -12,30 +12,13 @@ from launch_ros.actions import Node
 def generate_launch_description():
     raceline_path = LaunchConfiguration("raceline_path")
 
-    aggressive = {
+    base_pursuit_params = {
         "raceline_path": raceline_path,
-        "base_frame": "/base_link",
+        "base_frame": "particle_filter_base_frame",
         "drive_topic": "/drive",
         "odom_topic": "/odom",
         "min_lookahead": 0.25,
-        "max_lookahead": 1.0,
-        "lookahead_gain": 0.4,
-        "wheelbase": 0.33,
-        "max_steering_angle": 0.42,
-        "target_speed_scaling": 0.8,
-        "min_target_speed": 1.0,
-        "max_target_speed": 20.0,
-        "curvature_speed_gain": 0.2,
-    }
-
-    defensive = {
-        "raceline_path": raceline_path,
-        "base_frame": "/base_link",
-        "drive_topic": "/drive",
-        "odom_topic": "/odom",
-        "min_lookahead": 0.25,
-        "max_lookahead": 0.5,
-        "lookahead_gain": 0.4,
+        "lookahead_gain": 0.3,
         "wheelbase": 0.33,
         "max_steering_angle": 0.42,
         "target_speed_scaling": 0.8,
@@ -43,6 +26,9 @@ def generate_launch_description():
         "max_target_speed": 3.0,
         "curvature_speed_gain": 0.2,
     }
+
+    aggressive = {**base_pursuit_params, "max_lookahead": 1.0}
+    defensive = {**base_pursuit_params, "max_lookahead": 0.5}
 
     # for crazy_map
     track_layout = {
@@ -58,7 +44,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "raceline_path",
-                default_value="opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
+                default_value="/home/username/racecar_ws/src/arc_riders/opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
                 description="Path to the crazy_map raceline CSV.",
             ),
             IncludeLaunchDescription(
@@ -99,7 +85,7 @@ def generate_launch_description():
                 executable="raceline_pure_pursuit_node",
                 name="raceline_pure_pursuit_node",
                 output="screen",
-                parameters=[defensive],
+                parameters=[aggressive],
             ),
             Node(
                 package="lap_timer",
@@ -107,6 +93,35 @@ def generate_launch_description():
                 name="lap_timer_node",
                 output="screen",
                 parameters=[{"track_layout": json.dumps(track_layout)}],
+            ),
+            Node(
+                package="nav2_map_server",
+                executable="map_server",
+                name="map_server",
+                parameters=[
+                    {
+                        "yaml_filename": os.path.join(
+                            get_package_share_directory("launch_orchestrator"),
+                            "maps",
+                            "crazy_map.yaml",
+                        )
+                    },
+                    {"topic": "map"},
+                    {"frame_id": "map"},
+                    {"output": "screen"},
+                    {"use_sim_time": False},
+                ],
+            ),
+            Node(
+                package="nav2_lifecycle_manager",
+                executable="lifecycle_manager",
+                name="lifecycle_manager_localization",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": False},
+                    {"autostart": True},
+                    {"node_names": ["map_server"]},
+                ],
             ),
         ]
     )

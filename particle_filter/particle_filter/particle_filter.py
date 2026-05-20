@@ -693,7 +693,7 @@ class ParticleFiler(Node):
                 # this is for tracking particle filter speed
                 ips = 1.0 / (t2 - t1)
                 self.smoothing.append(ips)
-                if self.iters % 10 == 0:
+                if self.iters % 100 == 0:
                     self.get_logger().info(str(['iters per sec:', int(self.timer.fps()), ' possible:', int(self.smoothing.mean())]))
 
                 self.visualize()
