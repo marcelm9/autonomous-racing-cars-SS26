@@ -20,8 +20,8 @@ FollowGap::FollowGap() : Node("reactive")
 
   // variables
   this->declare_parameter<double>("max_speed", 3.0);
-  this->declare_parameter<int>("reac_n_extend", 15);
-  this->declare_parameter<double>("reac_step_depth", 0.1);
+  this->declare_parameter<int>("reac_n_extend", 100);
+  this->declare_parameter<double>("reac_step_depth", 0.5);
 }
 
 /* ---- CALLBACKS ---- */
@@ -69,12 +69,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (float r : raw_ranges) {
     ranges_cleaned.push_back(std::isfinite(r) ? r : scan_msg->range_max);
   }
-  std::vector<float> ranges_smoothed = this->preprocess_scan(ranges_cleaned);
+  std::vector<float> ranges = this->preprocess_scan(ranges_cleaned);
 
   //// DISPARITY EXTENSION ////
 
   std::vector<float> extended_ranges;
-  this->disparity_extender(ranges_smoothed, this->n_extend, this->step_depth, extended_ranges);
+  std::vector<int> extended_ranges_mask; // 1 if the range was extended to right , 2 if extended to left, 0 if original
+  this->disparity_extender(ranges, this->n_extend, this->step_depth, extended_ranges, extended_ranges_mask);
 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
@@ -82,7 +83,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
   {
     double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
-    this->find_gaps_by_threshold(extended_ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
+    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty())
     {
       this->diag_active_threshold = threshold; // Save for diagnostics
@@ -131,7 +132,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     }
 
     this->goal_angle = best_angle;
-    this->last_goal_angle = best_angle;
 
     if (oh_no_im_stuck)
     {
@@ -156,7 +156,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->goal_angle = 0;
   }
 
-  std::vector<float> &ranges = ranges_smoothed; // use smoothed ranges for wall avoidance
   double min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_right = -1;
   int idx_closest_left = -1;
@@ -270,7 +269,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->goal_angle_before_width_clamp = this->goal_angle; // Save for visualization
 
   // Geometric safety: ensure we steer far enough to clear the car's width
-  const double half_car_width = 6*0.2032 / 2.0; // approx 0.4m
+  const double half_car_width = 0*6*0.2032 / 2.0; // approx 0.4m
 
   if (idx_closest_right >= 0)
   {
@@ -287,6 +286,38 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   this->goal_angle_before_steer_clamp = this->goal_angle; // Save for visualization
+
+  // if goal angle is within an area which is extended by the disparity extender, push angle to edge of extention area
+  int goal_angle_ray_index = static_cast<int>((this->goal_angle - angle_min) / angle_increment);
+
+  // check if goal angle is within extended area
+  if(goal_angle_ray_index >= 0 && goal_angle_ray_index < extended_ranges.size() && extended_ranges_mask[goal_angle_ray_index] >> 0)
+  {
+    // push the goal angle away from that wall by at least the number of rays it was extended
+    if (extended_ranges_mask[goal_angle_ray_index] == 1) // 1 -> extended to right side
+    {
+      // right side, push right until mask is 0
+      // find how many rays to go right
+       int new_goal_index = goal_angle_ray_index;
+       while (new_goal_index < extended_ranges_mask.size() && extended_ranges_mask[new_goal_index] == 1)
+       {
+         new_goal_index++;
+       }
+       this->goal_angle = new_goal_index * angle_increment + angle_min; 
+    }
+    else // mask is 2 -> extended to left side
+    {
+      // left side, push left until mask is 0
+      // find how many rays to go left
+       int new_goal_index = goal_angle_ray_index;
+       while (new_goal_index >= 0 && extended_ranges_mask[new_goal_index] == 2)
+       {
+         new_goal_index--;
+       }
+       this->goal_angle = new_goal_index * angle_increment + angle_min;
+    }
+  }
+
 
   const double STEER_LIMIT = 0.2;
 
@@ -402,11 +433,13 @@ void FollowGap::disparity_extender(
     const std::vector<float> &ranges,
     int n_extend,
     float step_depth,
-    std::vector<float> &out_extended_ranges
+    std::vector<float> &out_extended_ranges,
+    std::vector<int> &out_extended_ranges_mask
 )
 {
   int num_lasers = ranges.size();
   out_extended_ranges = ranges; // Initialize with original ranges
+  out_extended_ranges_mask = std::vector<int>(num_lasers, 0); // Initialize mask 
 
   // Iterate through adjacent pairs of rays
   for (int i = 0; i < num_lasers - 1; i++)
@@ -431,7 +464,10 @@ void FollowGap::disparity_extender(
         
         for (int j = i + 1; j <= std::min(num_lasers - 1, i + current_n); j++)
         {
-          out_extended_ranges[j] = std::min(out_extended_ranges[j], r1);
+          if (r1 < out_extended_ranges[j]) {
+            out_extended_ranges[j] = r1;
+            out_extended_ranges_mask[j] = 1; // extended to the right
+          }
         }
       }
       else
@@ -444,7 +480,10 @@ void FollowGap::disparity_extender(
         // Overwrite the previous 'current_n' indices to the left.
         for (int j = i; j >= std::max(0, i + 1 - current_n); j--)
         {
-          out_extended_ranges[j] = std::min(out_extended_ranges[j], r2);
+          if (r2 < out_extended_ranges[j]) {
+            out_extended_ranges[j] = r2;
+            out_extended_ranges_mask[j] = 2; // extended to the left
+          }
         }
       }
     }

@@ -52,8 +52,8 @@ private:
     double SIGMA_SIDE = 0.2;
     double SIGMA_AMPLITUDE = 0.4;
 
-    int n_extend = 15; // how many rays should be extended on each side of a detected gap edge in the disparity extender
-    double step_depth = 0.1;
+    int n_extend = 100; // how many rays should be extended on each side of a detected gap edge in the disparity extender
+    double step_depth = 0.5;
 
     // ---- New Parameters for Stability ----
     int FILTER_WINDOW_SIZE = 5;      // Median filter size
@@ -96,6 +96,9 @@ private:
 
     bool oh_no_im_stuck = false;
 
+    // Tracking for disparity origins (-1: Right Obstacle, 1: Left Obstacle, 0: None)
+    std::vector<int> disparity_origins;
+
     sensor_msgs::msg::LaserScan scan_msg;
     nav_msgs::msg::Path path_msg;
     nav_msgs::msg::Odometry odom_msg;
@@ -125,7 +128,8 @@ private:
         const std::vector<float> &ranges,
         int n_extend,
         float step_depth,
-        std::vector<float> &out_extended_ranges
+        std::vector<float> &out_extended_ranges,
+        std::vector<int> &out_extended_ranges_mask
     );
 
     void find_gaps_by_threshold(
