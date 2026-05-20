@@ -86,9 +86,7 @@ def generate_launch_description():
                 name="raceline_pure_pursuit_node",
                 output="screen",
                 parameters=[aggressive],
-                remappings=[
-                    ("/drive", "/drive_pp")
-                ]
+                remappings=[("/drive", "/drive_pp")],
             ),
             Node(
                 package="reactive",
@@ -109,16 +107,23 @@ def generate_launch_description():
                     #     "/ego_racecar/scan", # ! somehow this breaks it
                     # ),
                 ],
-                parameters=[{
-                    "base_frame": "particle_filter_base_frame",
-                }]
+                parameters=[
+                    {
+                        "base_frame": "particle_filter_base_frame",
+                    }
+                ],
             ),
             Node(
                 package="lap_timer",
                 executable="lap_timer",
                 name="lap_timer_node",
                 output="screen",
-                parameters=[{"track_layout": json.dumps(track_layout)}],
+                parameters=[
+                    {
+                        "track_layout": json.dumps(track_layout),
+                        "base_frame": "particle_filter_base_frame",
+                    }
+                ],
             ),
             Node(
                 package="nav2_map_server",
