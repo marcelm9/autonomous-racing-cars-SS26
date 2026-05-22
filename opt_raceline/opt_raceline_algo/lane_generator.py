@@ -1,10 +1,21 @@
 import cv2
 import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import csv
 import yaml
 import os
 from pathlib import Path
+
+
+import cv2
+import numpy as np
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 WIDTH = 0.2032  # (m)
 WHEEL_LENGTH = 0.0381  # (m)
@@ -21,25 +32,34 @@ lane_colors = [(0, 0, 255),
 def show_result(imgs, title):
     if not imgs:
         return False
+
     height, width = imgs[0].shape[:2]
     w_show = 800
     scale_percent = float(w_show / width)
     h_show = int(scale_percent * height)
     dim = (w_show, h_show)
+
     img_resizes = []
     for img in imgs:
         img_resize = cv2.resize(img, dim, interpolation=cv2.INTER_AREA)
         img_resizes.append(img_resize)
+
     img_show = cv2.hconcat(img_resizes)
-    cv2.imshow(title, img_show)
+
+    # Use one persistent OpenCV window instead of repeatedly creating/destroying Qt windows
+    window_name = "lane_generator"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.imshow(window_name, img_show)
 
     print("Press Q to abort / other keys to proceed")
-    if cv2.waitKey(0) == ord('q'):
-        cv2.destroyAllWindows()
-        return False
-    else:
-        cv2.destroyAllWindows()
-        return True
+    key = cv2.waitKey(0)
+    cv2.waitKey(1)
+
+    # Do NOT call destroyAllWindows() here in Docker/Qt.
+    # It often causes the final core dump.
+    # cv2.destroyAllWindows()
+
+    return key != ord('q')
 
 
 def reorder_vertex(image, lane, plot=False):
