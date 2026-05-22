@@ -36,7 +36,8 @@ public:
 
 private:
     // PARAMETERS
-    double MAXDRIVESPEED = 3.0;
+    double MAXDRIVESPEED = 12.0;
+    double MINDRIVESPEED = 3.0;
     double BRAKE_TUNE = 0.1; //0.075; // higher --> brake later
 
     // parameters for gap finding

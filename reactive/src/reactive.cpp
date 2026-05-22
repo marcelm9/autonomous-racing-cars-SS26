@@ -20,12 +20,14 @@ FollowGap::FollowGap() : Node("reactive")
 
   // variables
   this->declare_parameter<double>("max_speed", this->MAXDRIVESPEED);
+  this->declare_parameter<double>("min_speed", this->MINDRIVESPEED);
   this->declare_parameter<int>("reac_n_extend", this->N_EXTEND);
   this->declare_parameter<double>("reac_step_depth", this->STEP_DEPTH);
   this->declare_parameter<double>("continuity_weight", this->CONTINUITY_WEIGHT);
 
   // Initialize from parameters
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("min_speed", this->MINDRIVESPEED);
   this->get_parameter("reac_n_extend", this->N_EXTEND);
   this->get_parameter("reac_step_depth", this->STEP_DEPTH);
   this->get_parameter("continuity_weight", this->CONTINUITY_WEIGHT);
@@ -58,6 +60,10 @@ rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const st
         if (param.get_name() == "max_speed") {
             this->MAXDRIVESPEED = param.as_double();
             RCLCPP_INFO(this->get_logger(), "Parameter 'max_speed' updated to: %.2f", this->MAXDRIVESPEED);
+        }
+        else if (param.get_name() == "min_speed") { // Handle dynamic updates for min_speed
+            this->MINDRIVESPEED = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'min_speed' updated to: %.2f", this->MINDRIVESPEED);
         }
         else if (param.get_name() == "continuity_weight") {
             this->CONTINUITY_WEIGHT = param.as_double();
@@ -115,6 +121,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   //// STEERING WITH WALL AVOIDANCE////
   // Steer to best gap using continuity scoring
 
+  double chosen_gap_dist = 0.0; // Track the distance of the selected gap for dynamic speed
+
   if (!all_gaps.empty())
   {
     double best_score = -std::numeric_limits<double>::infinity();
@@ -146,6 +154,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       if (score > best_score) {
         best_score = score;
         best_angle = gap_angle;
+        chosen_gap_dist = avg_dist;
       }
     }
 
@@ -356,29 +365,40 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   //// SPEED ////
 
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("min_speed", this->MINDRIVESPEED);
 
-  // Set the speed depending on the open space in front of the car
-  min_distance = std::numeric_limits<float>::infinity();
-  int idx_closest_front;
-
-  // front side
+  // Keep front-distance check purely for diagnostic visualization
+  float min_front_distance = std::numeric_limits<float>::infinity();
   for (int i = num_lasers / 2 - 10; i < num_lasers / 2 + 10; i++)
   {
-    if (ranges[i] < min_distance)
+    if (ranges[i] < min_front_distance)
     {
-      // find smallest range
-      min_distance = ranges[i];
-      idx_closest_front = i;
+      min_front_distance = ranges[i];
     }
   }
+  this->diag_dist_closest_front = min_front_distance; // Save for diagnostics
 
-  this->diag_dist_closest_front = min_distance; // Save for diagnostics
+  // Angle Factor: Slow down as steering angle increases
+  double max_steering_angle = 0.41; // Using your clamp limit
+  double angle_penalty = std::min(std::abs(this->goal_angle) / max_steering_angle, 1.0);
+  double angle_factor = 1.0 - angle_penalty; // 1.0 = straight, 0.0 = full lock
 
-  double speed_factor;
-  
-  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.01)); // offset exp by 0.1 so min value is above 0
+  // Distance Factor: Normalize chosen gap depth (0.0 = close, 1.0 = max depth)
+  double distance_factor = 0.0;
+  if (this->MAX_THRESHOLD > 0.0) {
+    distance_factor = std::min(chosen_gap_dist / this->MAX_THRESHOLD, 1.0);
+  }
 
-  double set_speed = this->MAXDRIVESPEED * speed_factor;
+  // Combine both factors to determine optimal speed multiplier [0.0, 1.0]
+  double speed_factor = distance_factor * angle_factor;
+
+  // Force speed multiplier to 0 if the robot is stuck
+  if (oh_no_im_stuck) {
+    speed_factor = 0.0;
+  }
+
+  // Scale the multiplier into the settable Minimum and Maximum speeds
+  double set_speed = this->MINDRIVESPEED + (speed_factor * (this->MAXDRIVESPEED - this->MINDRIVESPEED));
   this->diag_set_speed = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
