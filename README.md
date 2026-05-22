@@ -125,10 +125,11 @@ commits:
 #### Prerequisites
 You need a configured conda environment with python 3.8 !
 
-1. You can create one with: `conda create -n <my_env_name> python=3.8`
-2. Activate your enviroment: `conda activate <my_env_name>`
-3. navigate to `opt_raceline/opt_raceline_algo`
-4. Install all the needed dependencies: `pip install -r requirements.txt`
+conda create -n raceline_clean python=3.8 -y
+conda activate raceline_clean
+conda install -c conda-forge numpy=1.19.5 scipy=1.6.3 matplotlib=3.3.4 scikit-learn=0.23.2 pyyaml quadprog -y
+python -m pip install trajectory_planning_helpers==0.76 --no-deps
+python -m pip install casadi==3.5.5 opencv-contrib-python --no-deps
 
 
 #### Create a new optimal raceline
