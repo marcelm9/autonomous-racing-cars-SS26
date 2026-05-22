@@ -44,7 +44,6 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 "raceline_path",
-                default_value="/home/username/racecar_ws/src/arc_riders/opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
                 description="Path to the crazy_map raceline CSV.",
             ),
             IncludeLaunchDescription(
