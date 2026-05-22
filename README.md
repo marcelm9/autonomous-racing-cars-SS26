@@ -53,7 +53,7 @@
 
 ## Potential issues
 
-- If not map is being shown, most likely the tf tree is broken. I honestly don't know how to fix it, but there is a workaround: Publish a static transform using the command `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 ego_racecar/base_link laser`.
+- If not map is being shown, most likely the tf tree is broken. I honestly don't know how to fix it, but there is a workaround: Publish a static transform using the command `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 ego_racecar/base_link laser`. Note that this apparently has to be started AFTER the other `car_mapping_launch.py` command.
 
 - For maps with double sided walls (walls that are seen from both sides during the race) the car often tries to find some connection to aggressively. In this case it is recommended to only do one lap for the mapping.
 

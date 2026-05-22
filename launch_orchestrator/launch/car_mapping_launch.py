@@ -5,6 +5,7 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
+    IncludeLaunchDescription,
     LogInfo,
     RegisterEventHandler,
 )
@@ -15,6 +16,7 @@ from launch_ros.actions import LifecycleNode, Node
 from launch_ros.event_handlers import OnStateTransition
 from launch_ros.events.lifecycle import ChangeState
 from lifecycle_msgs.msg import Transition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 def generate_launch_description():
@@ -92,6 +94,17 @@ def generate_launch_description():
         ),
     )
 
+    # basic launch
+    basic_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory("f1tenth_stack"),
+                "launch",
+                "bringup_launch.py",
+            )
+        )
+    )
+
     # reactive node launch
     reactive = Node(
         package="reactive",
@@ -109,6 +122,7 @@ def generate_launch_description():
     ld.add_action(start_sync_slam_toolbox_node)
     ld.add_action(configure_event)
     ld.add_action(activate_event)
-    ld.add_entity(reactive)
+    ld.add_action(basic_launch)
+    ld.add_action(reactive)
 
     return ld

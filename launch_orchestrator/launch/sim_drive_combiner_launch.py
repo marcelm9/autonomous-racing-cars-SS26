@@ -108,7 +108,7 @@ def generate_launch_description():
                 name="drive_combiner",
                 output="screen",
                 remappings=[
-                    ("/odom", "/ego_racecar/odom"), # ! somehow this is needed
+                    ("/odom", "/ego_racecar/odom"),  # ! somehow this is needed
                     # (
                     #     "/scan",
                     #     "/ego_racecar/scan", # ! somehow this breaks it
