@@ -8,14 +8,14 @@ import rclpy
 from rclpy.node import Node
 
 from msgs.msg import Raceline, RacelinePoint
-
 from nav_msgs.msg import Path as PathMsg
 from geometry_msgs.msg import PoseStamped
 
-
-DEFAULT_RACELINE_PATH = (
-    "opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv"
+from ament_index_python.packages import (
+    get_package_share_directory,
+    PackageNotFoundError,
 )
+
 REQUIRED_COLUMNS = (
     "s_m",
     "x_m",
@@ -37,10 +37,7 @@ class RacelineCsvPublisher(Node):
     def __init__(self):
         super().__init__("raceline_csv_publisher")
 
-        self.declare_parameter(
-            "csv_path",
-            DEFAULT_RACELINE_PATH,
-        )
+        self.declare_parameter("csv_path")
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
 
@@ -79,18 +76,27 @@ class RacelineCsvPublisher(Node):
 
         if self.raceline_msg.points:
             self.get_logger().info(f"Loaded raceline CSV: {self.csv_path}")
-        self.get_logger().info(f"Number of raceline points: {len(self.raceline_msg.points)}")
+        self.get_logger().info(
+            f"Number of raceline points: {len(self.raceline_msg.points)}"
+        )
         self.get_logger().info("Publishing:")
         self.get_logger().info("  /raceline/trajectory  msgs/msg/Raceline")
         self.get_logger().info("  /raceline/path        nav_msgs/msg/Path")
 
     def resolve_csv_path(self, csv_path: str) -> str:
         path = Path(csv_path)
-        candidates = [
-            path,
-            Path.cwd() / path,
-            Path("/arc2026/ws/src/your_code/arc_riders") / path,
-        ]
+        candidates = []
+
+        # 1. Search in launch_orchestrator -> maps
+        orchestrator_share = Path(get_package_share_directory("launch_orchestrator"))
+        map_dir = orchestrator_share / "maps"
+
+        # If user passes exactly what's there (e.g., "map1.csv" or "map1/traj.csv")
+        candidates.append(map_dir / path)
+
+        # If user passes just "map1" without the extension, append .csv
+        if not path.suffix:
+            candidates.append(map_dir / f"{path}.csv")
 
         for candidate in candidates:
             if candidate.exists():
@@ -112,16 +118,27 @@ class RacelineCsvPublisher(Node):
                     continue
 
                 if stripped.startswith("#"):
-                    maybe_header = next(csv.reader([stripped[1:].strip()], delimiter=";"))
+                    maybe_header = next(
+                        csv.reader([stripped[1:].strip()], delimiter=";")
+                    )
                     maybe_header = [field.strip() for field in maybe_header]
-                    if "s_m" in maybe_header and "x_m" in maybe_header and "y_m" in maybe_header:
+                    if (
+                        "s_m" in maybe_header
+                        and "x_m" in maybe_header
+                        and "y_m" in maybe_header
+                    ):
                         header = maybe_header
                     continue
 
                 fields = next(csv.reader([stripped], delimiter=";"))
                 fields = [field.strip() for field in fields]
 
-                if header is None and "s_m" in fields and "x_m" in fields and "y_m" in fields:
+                if (
+                    header is None
+                    and "s_m" in fields
+                    and "x_m" in fields
+                    and "y_m" in fields
+                ):
                     header = fields
                     continue
 
@@ -134,7 +151,9 @@ class RacelineCsvPublisher(Node):
                     header = list(REQUIRED_COLUMNS)
 
                 column_index = {name: index for index, name in enumerate(header)}
-                missing = [name for name in REQUIRED_COLUMNS if name not in column_index]
+                missing = [
+                    name for name in REQUIRED_COLUMNS if name not in column_index
+                ]
                 if missing:
                     raise ValueError(
                         f"Raceline CSV is missing required columns: {', '.join(missing)}"
