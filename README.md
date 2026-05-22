@@ -45,22 +45,24 @@
 - `servo_min: 0.175`
 - `servo_max: 0.99`
 
-# SLAM and Localization
+# Creating a map (SLAM)
 
-Make sure to not have the `bringup_launch` running separately!
+1) `ros2 launch launch_orchestrator car_mapping_launch.py`
+2) drive around the map to build it (2 - 3 laps recommended), then contine with the next step
+3) `ros2 run nav2_map_server map_saver_cli -f ~/racecar_ws/src/arc_riders/launch_orchestrator/maps/MAP_NAME_HERE`
 
-The config file for the particle filter is located [here](~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml)
+## Potential issues
 
-1) `ros2 launch reactive car_reactive_launch.py`
-2) `ros2 launch launch_orchestrator slam_toolbox_launch.py`
-3) drive around the map to build it (2 - 3 laps recommended), then contine with the next step
-4) `ros2 run nav2_map_server map_saver_cli -f ~/racecar_ws/src/arc_riders/launch_orchestrator/maps/MAP_NAME_HERE`
-5) kill slam process
-6) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
-7) rebuild (`cd ~/racecar_ws && cb && src`)
-8) `ros2 launch particle_filter localize_launch.py`
+- If not map is being shown, most likely the tf tree is broken. I honestly don't know how to fix it, but there is a workaround: Publish a static transform using the command `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 ego_racecar/base_link laser`.
 
-To have a visualization of the map just run rviz2 with the `/map` topic. To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
+- For maps with double sided walls (walls that are seen from both sides during the race) the car often tries to find some connection to aggressively. In this case it is recommended to only do one lap for the mapping.
+
+# Localization
+1) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
+2) rebuild (`cd ~/racecar_ws && cb && src`)
+3) `ros2 launch particle_filter localize_launch.py`
+
+To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
 
 # raceline
 First install neccessary python package in your container
@@ -69,7 +71,7 @@ To launch run
 `ros2 launch simple_raceline test_launch.py`
 
 
-### Use mapserver to show map in rviz
+# Use mapserver to show map in rviz
 1) `ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=MAP_FILENAME_PATH-yaml`
 2) in different terminal:
  `ros2 run nav2_util lifecycle_bringup map_server`
@@ -78,9 +80,6 @@ To launch run
     Reliability Policy: `Reliable`
     Durability Policy: `Transiet Local` 
 
-
-### Launch crp_launch Arguments
-ros2 launch launch_orchestrator crp_launch.py map:=MAP_Name 
 
 # Foxglove Setup
 im Container installieren:
