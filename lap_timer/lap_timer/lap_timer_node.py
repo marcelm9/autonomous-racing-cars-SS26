@@ -10,28 +10,48 @@ class LapTimerNode(Node):
     def __init__(self):
         super().__init__("lap_timer_node")
 
-        # 1. Subscriptions and Publishers
-        self.subscription = self.create_subscription(
-            Odometry, "/ego_racecar/odom", self.odom_callback, 10
+        # 1. Declare parameters
+        self.declare_parameter(
+            "track_layout",
+            '{"start": [2.0, 2.0, -2.0, -2.0], "checkpoints": []}',
         )
 
-        # Publisher for RViz2 Markers
-        self.marker_pub = self.create_publisher(MarkerArray, "/track_markers", 10)
+        self.declare_parameter(
+            "frame_id",
+            "map",
+        )
+
+        self.declare_parameter(
+            "base_frame",
+            "/ego_racecar/odom",
+        )
 
         # 2. Read parameters
-        self.declare_parameter(
-            "track_layout", '{"start": [0.0, -2.0, 0.0, 2.0], "checkpoints": []}'
-        )
-        self.declare_parameter(
-            "frame_id", "map"
-        )  # Frame used by your simulator (usually 'map' or 'odom')
-
         layout_str = self.get_parameter("track_layout").value
         self.frame_id = self.get_parameter("frame_id").value
+        self.odom_topic = self.get_parameter("base_frame").value
+
         layout = json.loads(layout_str)
 
-        # 3. Parse coordinates into lines
+        self.get_logger().info(f"Subscribing to odometry topic: {self.odom_topic}")
+
+        # 3. Subscriptions and Publishers
+        self.subscription = self.create_subscription(
+            Odometry,
+            self.odom_topic,
+            self.odom_callback,
+            10,
+        )
+
+        self.marker_pub = self.create_publisher(
+            MarkerArray,
+            "/track_markers",
+            10,
+        )
+
+        # 4. Parse coordinates into lines
         self.lines = []
+
         sl = layout["start"]
         self.lines.append(((sl[0], sl[1]), (sl[2], sl[3])))
 
@@ -42,7 +62,7 @@ class LapTimerNode(Node):
             f"Loaded track with 1 Start Line and {len(self.lines) - 1} Checkpoints."
         )
 
-        # 4. State Variables
+        # 5. State Variables
         self.target_index = 0
         self.lap_started = False
         self.prev_pos = None
@@ -51,8 +71,11 @@ class LapTimerNode(Node):
         self.lap_count = 1
         self.min_lap_time = 3.0
 
-        # 5. Timer to periodically publish markers to RViz (every 1 second)
-        self.marker_timer = self.create_timer(1.0, self.publish_markers)
+        # 6. Timer for RViz markers
+        self.marker_timer = self.create_timer(
+            1.0,
+            self.publish_markers,
+        )
 
     def odom_callback(self, msg):
         curr_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)

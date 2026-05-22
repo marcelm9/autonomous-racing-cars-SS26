@@ -93,6 +93,27 @@ def generate_launch_description():
                 name="raceline_pure_pursuit_node",
                 output="screen",
                 parameters=[defensive],
+                remappings=[("/drive", "/drive_pp")],
+            ),
+            Node(
+                package="reactive",
+                executable="reactive",
+                name="reactive",
+                output="screen",
+                remappings=[("/drive", "/drive_re")],
+            ),
+            Node(
+                package="drive_combiner",
+                executable="drive_combiner",
+                name="drive_combiner",
+                output="screen",
+                remappings=[
+                    ("/odom", "/ego_racecar/odom"),  # ! somehow this is needed
+                    # (
+                    #     "/scan",
+                    #     "/ego_racecar/scan", # ! somehow this breaks it
+                    # ),
+                ],
             ),
             Node(
                 package="lap_timer",
