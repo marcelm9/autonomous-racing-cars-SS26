@@ -1,4 +1,4 @@
-#include "pure_pursuit/raceline_pure_pursuit.hpp"
+#include "pure_pursuit/pure_pursuit.hpp"
 
 #include <algorithm>
 #include <cmath>

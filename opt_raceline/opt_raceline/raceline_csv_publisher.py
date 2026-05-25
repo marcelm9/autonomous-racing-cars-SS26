@@ -2,6 +2,7 @@
 
 import csv
 import math
+import os
 from pathlib import Path
 
 import rclpy
@@ -37,11 +38,11 @@ class RacelineCsvPublisher(Node):
     def __init__(self):
         super().__init__("raceline_csv_publisher")
 
-        self.declare_parameter("csv_path")
+        self.declare_parameter("map_name")
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
 
-        self.csv_path = self.resolve_csv_path(self.get_parameter("csv_path").value)
+        self.csv_path = self.resolve_csv_path(self.get_parameter("map_name").value)
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
 
@@ -83,26 +84,15 @@ class RacelineCsvPublisher(Node):
         self.get_logger().info("  /raceline/trajectory  msgs/msg/Raceline")
         self.get_logger().info("  /raceline/path        nav_msgs/msg/Path")
 
-    def resolve_csv_path(self, csv_path: str) -> str:
-        path = Path(csv_path)
-        candidates = []
-
-        # 1. Search in launch_orchestrator -> maps
-        orchestrator_share = Path(get_package_share_directory("launch_orchestrator"))
-        map_dir = orchestrator_share / "maps"
-
-        # If user passes exactly what's there (e.g., "map1.csv" or "map1/traj.csv")
-        candidates.append(map_dir / path)
-
-        # If user passes just "map1" without the extension, append .csv
-        if not path.suffix:
-            candidates.append(map_dir / f"{path}.csv")
-
-        for candidate in candidates:
-            if candidate.exists():
-                return str(candidate)
-
-        return csv_path
+    def resolve_csv_path(self, map_name: str) -> str:
+        path = os.path.join(
+            get_package_share_directory("launch_orchestrator"),
+            "maps",
+            f"{map_name}.csv",
+        )
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Raceline CSV does not exist: {path}")
+        return path
 
     def load_raceline_csv(self, csv_path: str) -> Raceline:
         path = Path(csv_path)
