@@ -222,7 +222,6 @@ private:
         double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
         double switch_cooldown_seconds = this->get_parameter("switch_cooldown_seconds").as_double();
 
-        // Calculate time elapsed since our last mode switch
         rclcpp::Time current_time = this->now();
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
@@ -233,21 +232,26 @@ private:
 
         bool want_reactive_mode = (min_ttc <= ttc_threshold);
 
-        if (want_reactive_mode != reactive_mode_active_)
+        if (want_reactive_mode)
         {
-            if (elapsed_seconds >= switch_cooldown_seconds)
-            {
-                reactive_mode_active_ = want_reactive_mode;
-                last_switch_time_ = current_time; // reset cooldown clock
+            // Continuously reset the timer as long as we are still in danger.
+            // This ensures the cooldown only happens AFTER danger passes.
+            last_switch_time_ = current_time;
 
-                if (reactive_mode_active_)
-                {
-                    RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f < %.2f)", min_ttc, ttc_threshold);
-                }
-                else
-                {
-                    RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
-                }
+            if (!reactive_mode_active_)
+            {
+                // ALWAYS switch to reactive immediately
+                reactive_mode_active_ = true;
+                RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f <= %.2f)", min_ttc, ttc_threshold);
+            }
+        }
+        else
+        {
+            // We want pure pursuit mode. Check if we need to switch, and if the cooldown has passed.
+            if (reactive_mode_active_ && (elapsed_seconds >= switch_cooldown_seconds))
+            {
+                reactive_mode_active_ = false;
+                RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
             }
         }
 
