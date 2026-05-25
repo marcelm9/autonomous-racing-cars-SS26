@@ -8,7 +8,6 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
@@ -25,40 +24,26 @@ find_package(tf2 REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
- 
-add_library(raceline_pure_pursuit_helpers
-  src/raceline_pure_pursuit.cpp
-)
-target_include_directories(raceline_pure_pursuit_helpers
-  PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
+find_package(msgs REQUIRED)
+
+add_executable(pure_pursuit
+  src/pure_pursuit_node.cpp
+  src/pure_pursuit.cpp
 )
 
-add_executable(controller src/controller.cpp)
-ament_target_dependencies(controller
-  "rclcpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "sensor_msgs" "std_msgs" "std_srvs" "visualization_msgs" "diagnostic_msgs" "tf2_msgs" "nav_msgs" "tf2_geometry_msgs" "tf2_ros" "tf2"
+target_include_directories(pure_pursuit PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
 )
 
-add_executable(raceline_pure_pursuit_node src/raceline_pure_pursuit_node.cpp)
-target_link_libraries(raceline_pure_pursuit_node
-  raceline_pure_pursuit_helpers
-)
-ament_target_dependencies(raceline_pure_pursuit_node
-  "rclcpp" "ament_index_cpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "tf2_geometry_msgs" "tf2_ros" "tf2"
+ament_target_dependencies(pure_pursuit
+  "rclcpp" "ament_index_cpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "tf2_geometry_msgs" "tf2_ros" "tf2" "msgs"
 )
 
 install(TARGETS
-controller
-raceline_pure_pursuit_node
-DESTINATION lib/${PROJECT_NAME}
+  pure_pursuit
+  DESTINATION lib/${PROJECT_NAME}
 )
-
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}
-)
-
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

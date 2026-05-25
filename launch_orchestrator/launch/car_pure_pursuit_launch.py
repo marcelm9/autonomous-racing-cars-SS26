@@ -81,8 +81,8 @@ def generate_launch_description():
             ),
             Node(
                 package="pure_pursuit",
-                executable="raceline_pure_pursuit_node",
-                name="raceline_pure_pursuit_node",
+                executable="pure_pursuit",
+                name="pure_pursuit",
                 output="screen",
                 parameters=[aggressive],
             ),

@@ -1,5 +1,5 @@
-#ifndef PURE_PURSUIT_RACELINE_PURE_PURSUIT_HPP
-#define PURE_PURSUIT_RACELINE_PURE_PURSUIT_HPP
+#ifndef PURE_PURSUIT
+#define PURE_PURSUIT
 
 #include <cstddef>
 #include <string>
@@ -53,4 +53,4 @@ double computeCurvatureLimitedSpeed(
 
 }  // namespace pure_pursuit
 
-#endif  // PURE_PURSUIT_RACELINE_PURE_PURSUIT_HPP
+#endif  // PURE_PURSUIT

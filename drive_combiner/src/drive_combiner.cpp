@@ -25,32 +25,36 @@ public:
         this->declare_parameter<double>("ttc_cone_width_deg", 10.0);
         this->declare_parameter<std::string>("base_frame", "ego_racecar/base_link"); // ego_racecar/base_link in sim
         this->declare_parameter<double>("switch_cooldown_seconds", 1.0);
+        this->declare_parameter<std::string>("odom_topic");
+        this->declare_parameter<std::string>("scan_topic");
+        this->declare_parameter<std::string>("pp_input_topic");
+        this->declare_parameter<std::string>("re_input_topic");
+        this->declare_parameter<std::string>("drive_output_topic");
 
         // Initialize cooldown timer with current time
         last_switch_time_ = this->now();
 
         // subscribers
         scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
-            "/scan", 10, std::bind(&DriveCombiner::scan_callback, this, _1));
+            this->get_parameter("scan_topic").as_string().c_str(), 10, std::bind(&DriveCombiner::scan_callback, this, _1));
 
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/odom", 10, std::bind(&DriveCombiner::odom_callback, this, _1));
+            this->get_parameter("odom_topic").as_string().c_str(), 10, std::bind(&DriveCombiner::odom_callback, this, _1));
 
         drive_pp_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
-            "/drive_pp", 10, std::bind(&DriveCombiner::drive_pp_callback, this, _1));
+            this->get_parameter("pp_input_topic").as_string().c_str(), 10, std::bind(&DriveCombiner::drive_pp_callback, this, _1));
 
         drive_re_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
-            "/drive_re", 10, std::bind(&DriveCombiner::drive_re_callback, this, _1));
+            this->get_parameter("re_input_topic").as_string().c_str(), 10, std::bind(&DriveCombiner::drive_re_callback, this, _1));
 
         // publishers
-        drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
+        drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_output_topic").as_string().c_str(), 10);
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/mode_marker", 10);
         cone_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/cone_marker", 10);
 
-        RCLCPP_INFO(this->get_logger(), "Drive Combiner Node Started. Threshold ttc: %f, Cone Width: %f deg, Base Frame: %s, Switch Cooldown: %f s",
+        RCLCPP_INFO(this->get_logger(), "Drive Combiner Node Started. Threshold ttc: %f, Cone Width: %f deg, Switch Cooldown: %f s",
                     this->get_parameter("ttc_threshold").as_double(),
                     this->get_parameter("ttc_cone_width_deg").as_double(),
-                    this->get_parameter("base_frame").as_string().c_str(),
                     this->get_parameter("switch_cooldown_seconds").as_double());
     }
 
@@ -218,7 +222,6 @@ private:
         double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
         double switch_cooldown_seconds = this->get_parameter("switch_cooldown_seconds").as_double();
 
-        // Calculate time elapsed since our last mode switch
         rclcpp::Time current_time = this->now();
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
@@ -229,21 +232,26 @@ private:
 
         bool want_reactive_mode = (min_ttc <= ttc_threshold);
 
-        if (want_reactive_mode != reactive_mode_active_)
+        if (want_reactive_mode)
         {
-            if (elapsed_seconds >= switch_cooldown_seconds)
-            {
-                reactive_mode_active_ = want_reactive_mode;
-                last_switch_time_ = current_time; // reset cooldown clock
+            // Continuously reset the timer as long as we are still in danger.
+            // This ensures the cooldown only happens AFTER danger passes.
+            last_switch_time_ = current_time;
 
-                if (reactive_mode_active_)
-                {
-                    RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f < %.2f)", min_ttc, ttc_threshold);
-                }
-                else
-                {
-                    RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
-                }
+            if (!reactive_mode_active_)
+            {
+                // ALWAYS switch to reactive immediately
+                reactive_mode_active_ = true;
+                RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f <= %.2f)", min_ttc, ttc_threshold);
+            }
+        }
+        else
+        {
+            // We want pure pursuit mode. Check if we need to switch, and if the cooldown has passed.
+            if (reactive_mode_active_ && (elapsed_seconds >= switch_cooldown_seconds))
+            {
+                reactive_mode_active_ = false;
+                RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f)", min_ttc, ttc_threshold);
             }
         }
 

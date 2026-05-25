@@ -2,13 +2,16 @@
 
 FollowGap::FollowGap() : Node("reactive")
 {
+  this->declare_parameter<std::string>("scan_topic");
+  this->declare_parameter<std::string>("odom_topic");
+  this->declare_parameter<std::string>("drive_topic");
   /* ---- subscribers ---- */
-  scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("/scan", 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
+  scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(this->get_parameter("scan_topic").as_string().c_str(), 10, std::bind(&FollowGap::scan_callback, this, std::placeholders::_1));
   path_sub = this->create_subscription<nav_msgs::msg::Path>("/path", 10, std::bind(&FollowGap::path_callback, this, std::placeholders::_1));
-  odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("/odom", 10, std::bind(&FollowGap::odom_callback, this, std::placeholders::_1));
+  odom_sub = this->create_subscription<nav_msgs::msg::Odometry>(this->get_parameter("odom_topic").as_string().c_str(), 10, std::bind(&FollowGap::odom_callback, this, std::placeholders::_1));
 
   /* ---- publishers ---- */
-  drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/drive", 10);
+  drive_speed_pub = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_topic").as_string().c_str(), 10);
   gap_publisher = this->create_publisher<visualization_msgs::msg::MarkerArray>("/gap_vis", 1);
   diag_pub = this->create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 1);
   oh_no_im_stuck_publisher = this->create_publisher<std_msgs::msg::String>("/oh_no_im_stuck", 1);
