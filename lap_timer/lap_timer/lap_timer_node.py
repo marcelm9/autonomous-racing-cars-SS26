@@ -1,9 +1,11 @@
+import os
+
 import rclpy
-from rclpy.node import Node
-from nav_msgs.msg import Odometry
-from visualization_msgs.msg import Marker, MarkerArray
+from ament_index_python import get_package_share_directory
 from geometry_msgs.msg import Point
-import json
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 class LapTimerNode(Node):
@@ -11,10 +13,17 @@ class LapTimerNode(Node):
         super().__init__("lap_timer_node")
 
         # 1. Declare parameters
-        self.declare_parameter(
-            "track_layout",
-            '{"start": [2.0, 2.0, -2.0, -2.0], "checkpoints": []}',
+        self.declare_parameter("map_name")
+
+        map_checkpoints_path = os.path.join(
+            get_package_share_directory("launch_orchestrator"),
+            "maps",
+            f"{self.get_parameter('map_name').value}.checkpoints",
         )
+        if not os.path.exists(map_checkpoints_path):
+            raise FileNotFoundError(
+                f"Raceline checkpoints file does not exist: {map_checkpoints_path}"
+            )
 
         self.declare_parameter(
             "frame_id",
@@ -27,11 +36,8 @@ class LapTimerNode(Node):
         )
 
         # 2. Read parameters
-        layout_str = self.get_parameter("track_layout").value
         self.frame_id = self.get_parameter("frame_id").value
         self.odom_topic = self.get_parameter("base_frame").value
-
-        layout = json.loads(layout_str)
 
         self.get_logger().info(f"Subscribing to odometry topic: {self.odom_topic}")
 
@@ -51,12 +57,24 @@ class LapTimerNode(Node):
 
         # 4. Parse coordinates into lines
         self.lines = []
+        self.get_logger().info(f"Loading checkpoints from: {map_checkpoints_path}")
+        with open(map_checkpoints_path, "r") as f:
+            for line in [l for l in f.readlines() if l.strip() != ""]:
+                self.lines.append(
+                    (
+                        (
+                            float(line.split(",")[0].strip()),
+                            float(line.split(",")[1].strip()),
+                        ),
+                        (
+                            float(line.split(",")[2].strip()),
+                            float(line.split(",")[3].strip()),
+                        ),
+                    )
+                )
 
-        sl = layout["start"]
-        self.lines.append(((sl[0], sl[1]), (sl[2], sl[3])))
-
-        for cp in layout.get("checkpoints", []):
-            self.lines.append(((cp[0], cp[1]), (cp[2], cp[3])))
+        if len(self.lines) == 0:
+            raise ValueError("No checkpoints found in raceline checkpoints file.")
 
         self.get_logger().info(
             f"Loaded track with 1 Start Line and {len(self.lines) - 1} Checkpoints."

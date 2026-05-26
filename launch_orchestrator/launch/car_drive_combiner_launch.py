@@ -131,5 +131,17 @@ def generate_launch_description():
                     {"node_names": ["map_server"]},
                 ],
             ),
+            Node(
+                package="lap_timer",
+                executable="lap_timer",
+                name="lap_timer_node",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "particle_filter_base_frame",
+                    }
+                ],
+            ),
         ]
     )

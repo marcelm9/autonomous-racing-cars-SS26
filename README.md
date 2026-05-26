@@ -118,3 +118,6 @@ python -m pip install casadi==3.5.5 opencv-contrib-python --no-deps
 6. run `python raceline_scripts.py`
     The optimal raceline is now stored in `outputs/map_name/traj_race_cl.csv` .
 7. Move the generated raceline (`outputs/map_name/traj_race_cl.csv`) into the maps folder (`launch_orchestrator/maps`). The name of the file should be `<MAP_NAME>.csv`, for example `crazy_map.csv`.
+
+## Lap Timer
+To use the lap timer, create the file `<MAP_NAME>.checkpoints` in the directory `launch_orchestrator/maps`. Take inspiration from `crazy_map.checkpoints`. The first line is the starting line, every following line stands for one checkpoint. The format is `x1, y1, x2, y2`. Then add the node to the launch configuration (check out `sim_pure_pursuit_launch.py`).

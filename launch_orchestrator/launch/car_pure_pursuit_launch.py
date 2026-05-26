@@ -8,6 +8,7 @@ from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
+
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
 
@@ -74,11 +75,13 @@ def generate_launch_description():
                 name="map_server",
                 parameters=[
                     {
-                        "yaml_filename": PathJoinSubstitution([
-                            FindPackageShare("launch_orchestrator"),
-                            "maps",
-                            [map_name, ".yaml"]
-                        ])
+                        "yaml_filename": PathJoinSubstitution(
+                            [
+                                FindPackageShare("launch_orchestrator"),
+                                "maps",
+                                [map_name, ".yaml"],
+                            ]
+                        )
                     },
                     {"topic": "map"},
                     {"frame_id": "map"},
@@ -95,6 +98,18 @@ def generate_launch_description():
                     {"use_sim_time": False},
                     {"autostart": True},
                     {"node_names": ["map_server"]},
+                ],
+            ),
+            Node(
+                package="lap_timer",
+                executable="lap_timer",
+                name="lap_timer_node",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "particle_filter_base_frame",
+                    }
                 ],
             ),
         ]

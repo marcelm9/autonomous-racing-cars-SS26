@@ -4,10 +4,13 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    map_name = LaunchConfiguration("map_name")
+
     return LaunchDescription(
         [
             IncludeLaunchDescription(
@@ -30,6 +33,18 @@ def generate_launch_description():
                         "odom_topic": "/odom",
                         "drive_topic": "/drive",
                         "max_speed": 3.0,
+                    }
+                ],
+            ),
+            Node(
+                package="lap_timer",
+                executable="lap_timer",
+                name="lap_timer_node",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "particle_filter_base_frame",
                     }
                 ],
             ),
