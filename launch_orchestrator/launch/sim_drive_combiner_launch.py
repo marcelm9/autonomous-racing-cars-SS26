@@ -45,12 +45,12 @@ def generate_launch_description():
                         "odom_topic": "ego_racecar/odom",
                         "min_lookahead": 0.25,
                         "max_lookahead": 0.9,
-                        "lookahead_gain": 0.4,
+                        "lookahead_gain": 0.75,
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
                         "target_speed_scaling": 0.8,
                         "min_target_speed": 1.0,
-                        "max_target_speed": 10.0,
+                        "max_target_speed": 15.0,
                         "curvature_speed_gain": 0.2,
                     }
                 ],
@@ -65,7 +65,7 @@ def generate_launch_description():
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
                         "drive_topic": "ego_racecar/drive_re",
-                        "max_speed": 3.0,
+                        "max_speed": 10.0,
                     }
                 ],
             ),
@@ -82,6 +82,8 @@ def generate_launch_description():
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
                         "ttc_threshold": 0.5,
+                        "ttc_cone_width_deg": 10.0,
+                        "raceline_distance_threshold": 0.25
                     }
                 ],
             ),
