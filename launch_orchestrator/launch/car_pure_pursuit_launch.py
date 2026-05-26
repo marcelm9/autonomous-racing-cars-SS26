@@ -41,17 +41,18 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
+                        # parameters for craziest_map_bridge
                         "base_frame": "particle_filter_base_frame",
                         "drive_topic": "/drive",
                         "odom_topic": "/odom",
                         "min_lookahead": 0.25,
-                        "max_lookahead": 0.6,
-                        "lookahead_gain": 0.4,
+                        "max_lookahead": 1.0,
+                        "lookahead_gain": 1.0,
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
                         "target_speed_scaling": 0.8,
-                        "min_target_speed": 1.0,
-                        "max_target_speed": 20.0,
+                        "min_target_speed": 0.5,
+                        "max_target_speed": 3.7,
                         "curvature_speed_gain": 0.2,
                     }
                 ],
