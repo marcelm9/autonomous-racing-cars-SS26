@@ -3,32 +3,14 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    raceline_path = LaunchConfiguration("raceline_path")
-
-    base_pursuit_params = {
-        "raceline_path": raceline_path,
-        "base_frame": "particle_filter_base_frame",
-        "drive_topic": "/drive",
-        "odom_topic": "/odom",
-        "min_lookahead": 0.25,
-        "lookahead_gain": 0.3,
-        "wheelbase": 0.33,
-        "max_steering_angle": 0.42,
-        "target_speed_scaling": 0.8,
-        "min_target_speed": 1.0,
-        "max_target_speed": 3.0,
-        "curvature_speed_gain": 0.2,
-    }
-
-    aggressive = {**base_pursuit_params, "max_lookahead": 1.0}
-    defensive = {**base_pursuit_params, "max_lookahead": 0.5}
+    map_name = LaunchConfiguration("map_name")
 
     # for crazy_map
     track_layout = {
@@ -42,11 +24,6 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            DeclareLaunchArgument(
-                "raceline_path",
-                default_value="/home/username/racecar_ws/src/arc_riders/opt_raceline/opt_raceline_algo/outputs/crazy_map/traj_race_cl.csv",
-                description="Path to the crazy_map raceline CSV.",
-            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     os.path.join(
@@ -63,7 +40,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "csv_path": raceline_path,
+                        "map_name": map_name,
                     }
                 ],
             ),
@@ -85,31 +62,51 @@ def generate_launch_description():
                 executable="pure_pursuit",
                 name="pure_pursuit",
                 output="screen",
-                parameters=[aggressive],
-                remappings=[("/drive", "/drive_pp")],
+                parameters=[
+                    {
+                        "base_frame": "particle_filter_base_frame",
+                        "drive_topic": "/drive_pp",
+                        "odom_topic": "/odom",
+                        "min_lookahead": 0.25,
+                        "max_lookahead": 0.9,
+                        "lookahead_gain": 0.4,
+                        "wheelbase": 0.33,
+                        "max_steering_angle": 0.42,
+                        "target_speed_scaling": 0.8,
+                        "min_target_speed": 1.0,
+                        "max_target_speed": 10.0,
+                        "curvature_speed_gain": 0.2,
+                    }
+                ],
             ),
             Node(
                 package="reactive",
                 executable="reactive",
                 name="reactive",
                 output="screen",
-                remappings=[("/drive", "/drive_re")],
+                parameters=[
+                    {
+                        "scan_topic": "/scan",
+                        "odom_topic": "/odom",
+                        "drive_topic": "/drive_re",
+                        "max_speed": 3.0,
+                    }
+                ],
             ),
             Node(
                 package="drive_combiner",
                 executable="drive_combiner",
                 name="drive_combiner",
                 output="screen",
-                remappings=[
-                    # ("/odom", "/ego_racecar/odom"), # ! somehow this is needed
-                    # (
-                    #     "/scan",
-                    #     "/ego_racecar/scan", # ! somehow this breaks it
-                    # ),
-                ],
                 parameters=[
                     {
                         "base_frame": "particle_filter_base_frame",
+                        "pp_input_topic": "/drive_pp",
+                        "re_input_topic": "/drive_re",
+                        "drive_output_topic": "/drive",
+                        "scan_topic": "/scan",
+                        "odom_topic": "/odom",
+                        "ttc_threshold": 0.5,
                     }
                 ],
             ),
@@ -121,7 +118,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         "track_layout": json.dumps(track_layout),
-                        "base_frame": "particle_filter_base_frame",
+                        "base_frame": "ego_racecar/odom",
                     }
                 ],
             ),
@@ -134,7 +131,7 @@ def generate_launch_description():
                         "yaml_filename": os.path.join(
                             get_package_share_directory("launch_orchestrator"),
                             "maps",
-                            "crazy_map.yaml",
+                            "craziest_map_bridge.yaml",
                         )
                     },
                     {"topic": "map"},
