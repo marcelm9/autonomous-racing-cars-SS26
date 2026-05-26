@@ -1,13 +1,12 @@
-import json
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
-
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
@@ -35,20 +34,6 @@ def generate_launch_description():
                 ],
             ),
             Node(
-                package="particle_filter",
-                executable="particle_filter",
-                name="particle_filter",
-                output="screen",
-                parameters=[
-                    os.path.join(
-                        get_package_share_directory("particle_filter"),
-                        "config",
-                        "localize.yaml",
-                    ),
-                    {"map": map_name}, # ! NOT TESTED
-                ],
-            ),
-            Node(
                 package="pure_pursuit",
                 executable="pure_pursuit",
                 name="pure_pursuit",
@@ -71,16 +56,29 @@ def generate_launch_description():
                 ],
             ),
             Node(
+                package="particle_filter",
+                executable="particle_filter",
+                name="particle_filter",
+                output="screen",
+                parameters=[
+                    os.path.join(
+                        get_package_share_directory("particle_filter"),
+                        "config",
+                        "localize.yaml",
+                    ),
+                ],
+            ),
+            Node(
                 package="nav2_map_server",
                 executable="map_server",
                 name="map_server",
                 parameters=[
                     {
-                        "yaml_filename": os.path.join(
-                            get_package_share_directory("launch_orchestrator"),
+                        "yaml_filename": PathJoinSubstitution([
+                            FindPackageShare("launch_orchestrator"),
                             "maps",
-                            "craziest_map_bridge.yaml",
-                        )
+                            [map_name, ".yaml"]
+                        ])
                     },
                     {"topic": "map"},
                     {"frame_id": "map"},

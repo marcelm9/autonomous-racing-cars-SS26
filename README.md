@@ -33,9 +33,7 @@ Launch files should all be in `launch_orchestrator/launch`. Naming convention: p
 - For maps with double sided walls (walls that are seen from both sides during the race) the car often tries to find some connection to aggressively. In this case it is recommended to only do one lap for the mapping.
 
 ## Localization
-1) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
-2) rebuild (`cd ~/racecar_ws && cb && src`)
-3) `ros2 launch particle_filter localize_launch.py`
+To achieve localization, take a look at the launch file `car_pure_pursuit_launch.py`. The important part here is that parallel to the particle filter you also have to launch a map server and its lifecycle node. The argument for why it is implemented this way is that you can now use the parameter `map_name` instead of editing the file `localize.yaml`. This makes switching between maps and their corresponding racelines more convenient and also reduces the potential for errors (eg. forgetting to edit `localize.yaml`).
 
 To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
 

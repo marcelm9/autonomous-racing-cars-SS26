@@ -1,2 +1,0 @@
-- test mapping launch
-- change launch stuff of particle filter to set map_name dynamically (avoid changing in `localize.yaml`)

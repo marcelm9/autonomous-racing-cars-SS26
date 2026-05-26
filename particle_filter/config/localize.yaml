@@ -40,7 +40,12 @@ particle_filter:
     # sensor model variant, variant 2 good for rmgpu, 3 doesn't work for rmgpu
     rangelib_variant: 2
 
-map_server:
-  ros__parameters:
-    # assuming map file is in arc_riders/launch_orchestrator/maps
-    map: 'MAP_NAME_HERE'
+# ! IMPORTANT: When using the particle filter, we always also launch a map server for visualization
+# !            in rviz2. Hence, launching a map server here is not necessary and only interferes with 
+# !            our goal of streamlining startup. The code of the particle filter itself was also
+# !            modified to fit this line of thought.
+
+# map_server: # ! DO NOT USE
+#   ros__parameters:
+#     # assuming map file is in arc_riders/launch_orchestrator/maps
+#     map: 'MAP_NAME_HERE'
