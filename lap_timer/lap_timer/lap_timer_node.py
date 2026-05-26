@@ -1,9 +1,13 @@
+import os
+
 import rclpy
-from rclpy.node import Node
-from nav_msgs.msg import Odometry
-from visualization_msgs.msg import Marker, MarkerArray
+from ament_index_python import get_package_share_directory
 from geometry_msgs.msg import Point
-import json
+from rclpy.node import Node
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 class LapTimerNode(Node):
@@ -11,10 +15,17 @@ class LapTimerNode(Node):
         super().__init__("lap_timer_node")
 
         # 1. Declare parameters
-        self.declare_parameter(
-            "track_layout",
-            '{"start": [2.0, 2.0, -2.0, -2.0], "checkpoints": []}',
+        self.declare_parameter("map_name")
+
+        map_checkpoints_path = os.path.join(
+            get_package_share_directory("launch_orchestrator"),
+            "maps",
+            f"{self.get_parameter('map_name').value}.checkpoints",
         )
+        if not os.path.exists(map_checkpoints_path):
+            raise FileNotFoundError(
+                f"Raceline checkpoints file does not exist: {map_checkpoints_path}"
+            )
 
         self.declare_parameter(
             "frame_id",
@@ -23,25 +34,26 @@ class LapTimerNode(Node):
 
         self.declare_parameter(
             "base_frame",
-            "/ego_racecar/odom",
+            "ego_racecar/base_link",
+        )
+
+        self.declare_parameter(
+            "update_rate_hz",
+            100.0,
         )
 
         # 2. Read parameters
-        layout_str = self.get_parameter("track_layout").value
         self.frame_id = self.get_parameter("frame_id").value
-        self.odom_topic = self.get_parameter("base_frame").value
+        self.base_frame = self.get_parameter("base_frame").value
+        update_rate_hz = self.get_parameter("update_rate_hz").value
 
-        layout = json.loads(layout_str)
-
-        self.get_logger().info(f"Subscribing to odometry topic: {self.odom_topic}")
-
-        # 3. Subscriptions and Publishers
-        self.subscription = self.create_subscription(
-            Odometry,
-            self.odom_topic,
-            self.odom_callback,
-            10,
+        self.get_logger().info(
+            f"Looking up TF from {self.frame_id} to {self.base_frame}"
         )
+
+        # 3. Setup TF Listener instead of Odom Subscription
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.marker_pub = self.create_publisher(
             MarkerArray,
@@ -51,12 +63,24 @@ class LapTimerNode(Node):
 
         # 4. Parse coordinates into lines
         self.lines = []
+        self.get_logger().info(f"Loading checkpoints from: {map_checkpoints_path}")
+        with open(map_checkpoints_path, "r") as f:
+            for line in [l for l in f.readlines() if l.strip() != ""]:
+                self.lines.append(
+                    (
+                        (
+                            float(line.split(",")[0].strip()),
+                            float(line.split(",")[1].strip()),
+                        ),
+                        (
+                            float(line.split(",")[2].strip()),
+                            float(line.split(",")[3].strip()),
+                        ),
+                    )
+                )
 
-        sl = layout["start"]
-        self.lines.append(((sl[0], sl[1]), (sl[2], sl[3])))
-
-        for cp in layout.get("checkpoints", []):
-            self.lines.append(((cp[0], cp[1]), (cp[2], cp[3])))
+        if len(self.lines) == 0:
+            raise ValueError("No checkpoints found in raceline checkpoints file.")
 
         self.get_logger().info(
             f"Loaded track with 1 Start Line and {len(self.lines) - 1} Checkpoints."
@@ -71,14 +95,32 @@ class LapTimerNode(Node):
         self.lap_count = 1
         self.min_lap_time = 3.0
 
-        # 6. Timer for RViz markers
+        # 6. Timers
         self.marker_timer = self.create_timer(
             1.0,
             self.publish_markers,
         )
 
-    def odom_callback(self, msg):
-        curr_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        # High frequency timer to poll position and check line intersections
+        self.position_timer = self.create_timer(
+            1.0 / update_rate_hz, self.position_callback
+        )
+
+    def position_callback(self):
+        try:
+            # Look up the latest transform between map and base_link
+            t = self.tf_buffer.lookup_transform(
+                self.frame_id, self.base_frame, rclpy.time.Time()
+            )
+        except TransformException as ex:
+            self.get_logger().warn(
+                f"Could not transform {self.frame_id} to {self.base_frame}: {ex}",
+                throttle_duration_sec=2.0,
+            )
+            return
+
+        # Extract X and Y position from the transform
+        curr_pos = (t.transform.translation.x, t.transform.translation.y)
 
         if self.prev_pos is not None:
             target_line = self.lines[self.target_index]

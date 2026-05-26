@@ -1,43 +1,14 @@
-# STARTUP
- 
-## Build only one package
+# MANUAL
+
+## General stuff
+
+### Build only one package
 `colcon build --packages-select reactive`
 
-## Source Files
+### Source Files
 `source /opt/ros/jazzy/setup.bash && source install/setup.bash`
 
-## Things you might want to launch
-
-### better_keyboard_control
-`ros2 run better_keyboard_control better_keyboard_control`
-
-### gym_bridge_launch
-`ros2 launch f1tenth_gym_ros gym_bridge_launch.py`
-
-### safety_node1
-`ros2 launch safety_node1 safety_node1_launch.py`
-
-### reconfigure
-`ros2 run rqt_reconfigure rqt_reconfigure`
-
-### request ebrake disengagement
-`ros2 service call /reset_safety_node std_srvs/srv/Trigger {}`
-
-
-### Launch reactive node
-`ros2 launch reactive reactive_launch.py`
-
-## Launch reactive node in multi agent scenario
-1) `ros2 launch reactive reactive_launch.py`
-2) new console, source
-3) `ros2 launch reactive reactive_launch.py scan_topic:=/opp_scan odom_topic:=/opp_racecar/odom drive_topic:=/opp_drive use_sim:=false`
-
-
-
-### Launch reactive and safety node
-`ros2 launch launch_orchestrator safe_reactive_launch.py`
-
-# VESC config
+### VESC config
 - `speed_to_erpm_gain: 7500.0`
 - `speed_to_erpm_offset: -32.0`
 - `steering_angle_to_servo_gain: -1.8`
@@ -45,33 +16,36 @@
 - `servo_min: 0.175`
 - `servo_max: 0.99`
 
-# Creating a map (SLAM)
+### Launching stuff
+
+Launch files should all be in `launch_orchestrator/launch`. Naming convention: prefix `car_` means the launch file is meant for the actual racecar, prefix `sim_` means the launch file is meant for the simulator. For most stuff there already exists a launch file you can copy stuff from (eg. `car_reactive_launch.py`, `sim_reactive_launch.py`, ...).
+
+## Creating a map (SLAM)
 
 1) `ros2 launch launch_orchestrator car_mapping_launch.py`
 2) drive around the map to build it (2 - 3 laps recommended), then contine with the next step
 3) `ros2 run nav2_map_server map_saver_cli -f ~/racecar_ws/src/arc_riders/launch_orchestrator/maps/MAP_NAME_HERE`
 
-## Potential issues
+### Potential issues
 
 - If not map is being shown, most likely the tf tree is broken. I honestly don't know how to fix it, but there is a workaround: Publish a static transform using the command `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 ego_racecar/base_link laser`. Note that this apparently has to be started AFTER the other `car_mapping_launch.py` command.
 
 - For maps with double sided walls (walls that are seen from both sides during the race) the car often tries to find some connection to aggressively. In this case it is recommended to only do one lap for the mapping.
 
-# Localization
-1) edit the filename in `~/racecar_ws/src/arc_riders/particle_filter/config/localize.yaml` (line 36)
-2) rebuild (`cd ~/racecar_ws && cb && src`)
-3) `ros2 launch particle_filter localize_launch.py`
+## Localization
+To achieve localization, take a look at the launch file `car_pure_pursuit_launch.py`. The important part here is that parallel to the particle filter you also have to launch a map server and its lifecycle node. The argument for why it is implemented this way is that you can now use the parameter `map_name` instead of editing the file `localize.yaml`. This makes switching between maps and their corresponding racelines more convenient and also reduces the potential for errors (eg. forgetting to edit `localize.yaml`).
 
 To visualize the particle filter add the `/pf/viz/inferred_pose` and `/pf/viz/particles` topics.
 
-# raceline
+## raceline (DEPRECATED)
 First install neccessary python package in your container
 `sudo apt update && sudo apt install python3-skimage`
 To launch run
 `ros2 launch simple_raceline test_launch.py`
 
+INFO: This is for the old "simple_raceline" node provided by the lecture.
 
-# Use mapserver to show map in rviz
+## Use mapserver to show map in rviz
 1) `ros2 run nav2_map_server map_server --ros-args -p yaml_filename:=MAP_FILENAME_PATH-yaml`
 2) in different terminal:
  `ros2 run nav2_util lifecycle_bringup map_server`
@@ -81,34 +55,27 @@ To launch run
     Durability Policy: `Transiet Local` 
 
 
-# Foxglove Setup
+## Foxglove Setup
 im Container installieren:
 
+```sh
 sudo apt update
 sudo apt install ros-jazzy-foxglove-bridge
+```
 
 diese node muss im Hintergrund laufen:
 
+```sh
 ros2 run foxglove_bridge foxglove_bridge
+```
 
 Port 8765 nach außen legen:
 in VS Code neben dem Terminal bei Ports 8765 hinzufügen
 
-Bei Foxglove anmelden: studio.foxglove.dev
-configs finden sich in configs/foxglove
+Bei Foxglove anmelden: `studio.foxglove.dev`
+configs finden sich in `configs/foxglove`
 
-# Tunable Parameters
-
-in der .hpp als Parameter definieren:
-double MAXDRIVESPEED;
-
-in der .cpp:
-    FollowGap::FollowGap() : Node("reactive")
-        this->declare_parameter<double>("max_speed", 20.0);
-    im callback:
-        this->get_parameter("max_speed", this->MAXDRIVESPEED);
-
-# git naming convention
+## git naming convention
 
 branches:
 - feature/...
@@ -119,19 +86,20 @@ commits:
 - removed ...
 - changed ...
 
-### How to create you very own special perfect raceline
+## (Perfect) TUM Raceline
 
-#### Prerequisites
-You need a configured conda environment with python 3.8 !
+### Prerequisites
+You need a configured conda environment with python 3.8
 
+```sh
 conda create -n raceline_clean python=3.8 -y
 conda activate raceline_clean
 conda install -c conda-forge numpy=1.19.5 scipy=1.6.3 matplotlib=3.3.4 scikit-learn=0.23.2 pyyaml quadprog -y
 python -m pip install trajectory_planning_helpers==0.76 --no-deps
 python -m pip install casadi==3.5.5 opencv-contrib-python --no-deps
+```
 
-
-#### Create a new optimal raceline
+### Create a new optimal raceline
 (This does not work on macs with silicon chips)
 
 1. make sure your map.pgm and your `map.yaml` is located in `launch_orchestrator/maps`
@@ -149,11 +117,7 @@ python -m pip install casadi==3.5.5 opencv-contrib-python --no-deps
     - `s_reg`
 6. run `python raceline_scripts.py`
     The optimal raceline is now stored in `outputs/map_name/traj_race_cl.csv` .
+7. Move the generated raceline (`outputs/map_name/traj_race_cl.csv`) into the maps folder (`launch_orchestrator/maps`). The name of the file should be `<MAP_NAME>.csv`, for example `crazy_map.csv`.
 
-
-#### Publish the raceline
-You can start a node that publishes the current raceline stored in `outputs/map_name/traj_race_cl.csv` with
-`ros2 run opt_raceline raceline_csv_publisher`
-
-
-
+## Lap Timer
+To use the lap timer, create the file `<MAP_NAME>.checkpoints` in the directory `launch_orchestrator/maps`. Take inspiration from `crazy_map.checkpoints`. The first line is the starting line, every following line stands for one checkpoint. The format is `x1, y1, x2, y2`. Then add the node to the launch configuration (check out `sim_pure_pursuit_launch.py`).

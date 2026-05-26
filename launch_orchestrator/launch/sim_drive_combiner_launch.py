@@ -1,4 +1,3 @@
-import json
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -11,16 +10,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
-
-    # for crazy_map
-    track_layout = {
-        "start": [2.26, -3.9, 1.9, -2.2],
-        "checkpoints": [
-            [-5.5, -3.4, -5.76, -1.8],
-            [-2.87, 1.48, -3.42, 3.44],
-            [-7, -4.8, -8.4, -6],
-        ],
-    }
 
     return LaunchDescription(
         [
@@ -103,8 +92,8 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "track_layout": json.dumps(track_layout),
-                        "base_frame": "ego_racecar/odom",
+                        "map_name": map_name,
+                        "base_frame": "ego_racecar/base_link",
                     }
                 ],
             ),
