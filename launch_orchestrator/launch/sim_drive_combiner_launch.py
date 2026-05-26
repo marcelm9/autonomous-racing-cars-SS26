@@ -93,7 +93,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         "map_name": map_name,
-                        "base_frame": "ego_racecar/odom",
+                        "base_frame": "ego_racecar/base_link",
                     }
                 ],
             ),

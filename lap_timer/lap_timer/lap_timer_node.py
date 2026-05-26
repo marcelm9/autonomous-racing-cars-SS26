@@ -3,8 +3,10 @@ import os
 import rclpy
 from ament_index_python import get_package_share_directory
 from geometry_msgs.msg import Point
-from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from tf2_ros import TransformException
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 from visualization_msgs.msg import Marker, MarkerArray
 
 
@@ -32,22 +34,26 @@ class LapTimerNode(Node):
 
         self.declare_parameter(
             "base_frame",
-            "/ego_racecar/odom",
+            "ego_racecar/base_link",
+        )
+
+        self.declare_parameter(
+            "update_rate_hz",
+            100.0,
         )
 
         # 2. Read parameters
         self.frame_id = self.get_parameter("frame_id").value
-        self.odom_topic = self.get_parameter("base_frame").value
+        self.base_frame = self.get_parameter("base_frame").value
+        update_rate_hz = self.get_parameter("update_rate_hz").value
 
-        self.get_logger().info(f"Subscribing to odometry topic: {self.odom_topic}")
-
-        # 3. Subscriptions and Publishers
-        self.subscription = self.create_subscription(
-            Odometry,
-            self.odom_topic,
-            self.odom_callback,
-            10,
+        self.get_logger().info(
+            f"Looking up TF from {self.frame_id} to {self.base_frame}"
         )
+
+        # 3. Setup TF Listener instead of Odom Subscription
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.marker_pub = self.create_publisher(
             MarkerArray,
@@ -89,14 +95,32 @@ class LapTimerNode(Node):
         self.lap_count = 1
         self.min_lap_time = 3.0
 
-        # 6. Timer for RViz markers
+        # 6. Timers
         self.marker_timer = self.create_timer(
             1.0,
             self.publish_markers,
         )
 
-    def odom_callback(self, msg):
-        curr_pos = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+        # High frequency timer to poll position and check line intersections
+        self.position_timer = self.create_timer(
+            1.0 / update_rate_hz, self.position_callback
+        )
+
+    def position_callback(self):
+        try:
+            # Look up the latest transform between map and base_link
+            t = self.tf_buffer.lookup_transform(
+                self.frame_id, self.base_frame, rclpy.time.Time()
+            )
+        except TransformException as ex:
+            self.get_logger().warn(
+                f"Could not transform {self.frame_id} to {self.base_frame}: {ex}",
+                throttle_duration_sec=2.0,
+            )
+            return
+
+        # Extract X and Y position from the transform
+        curr_pos = (t.transform.translation.x, t.transform.translation.y)
 
         if self.prev_pos is not None:
             target_line = self.lines[self.target_index]
