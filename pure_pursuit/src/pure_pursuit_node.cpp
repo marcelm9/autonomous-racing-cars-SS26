@@ -11,26 +11,12 @@
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "tf2_ros/buffer.hpp"
 #include "tf2_ros/transform_listener.hpp"
 #include "msgs/msg/raceline.hpp"
-
-namespace
-{
-
-  geometry_msgs::msg::Quaternion yawToQuaternion(double yaw_rad)
-  {
-    geometry_msgs::msg::Quaternion quaternion;
-    quaternion.x = 0.0;
-    quaternion.y = 0.0;
-    quaternion.z = std::sin(yaw_rad / 2.0);
-    quaternion.w = std::cos(yaw_rad / 2.0);
-    return quaternion;
-  }
-
-} // namespace
 
 class RacelinePurePursuitNode : public rclcpp::Node
 {
@@ -45,18 +31,59 @@ public:
     this->declare_parameter<std::string>("drive_topic", "/drive");
     this->declare_parameter<std::string>("odom_topic", "/ego_racecar/odom");
     this->declare_parameter<double>("control_rate_hz", 20.0);
-    this->declare_parameter<double>("min_lookahead", 0.7);
-    this->declare_parameter<double>("max_lookahead", 3.0);
-    this->declare_parameter<double>("lookahead_gain", 0.35);
+    this->declare_parameter<double>("min_lookahead", 0.5);
+    this->declare_parameter<double>("max_lookahead", 2.0);
     this->declare_parameter<double>("wheelbase", 0.33);
     this->declare_parameter<double>("max_steering_angle", 0.42);
-    this->declare_parameter<double>("target_speed_scaling", 0.65);
-    this->declare_parameter<double>("min_target_speed", 1.0);
-    this->declare_parameter<double>("max_target_speed", 6.0);
-    this->declare_parameter<double>("curvature_speed_gain", 0.5);
+    this->declare_parameter<double>("min_speed", 1.5);
+    this->declare_parameter<double>("max_speed", 4.0);
 
     map_frame_ = this->get_parameter("map_frame").as_string();
     base_frame_ = this->get_parameter("base_frame").as_string();
+
+    // Cache the control parameters to avoid map lookups in the control loop
+    min_lookahead_ = this->get_parameter("min_lookahead").as_double();
+    max_lookahead_ = this->get_parameter("max_lookahead").as_double();
+    wheelbase_ = this->get_parameter("wheelbase").as_double();
+    max_steering_angle_ = this->get_parameter("max_steering_angle").as_double();
+    min_speed_ = this->get_parameter("min_speed").as_double();
+    max_speed_ = this->get_parameter("max_speed").as_double();
+
+    // Setup the parameter update callback for dynamic rqt/CLI tuning
+    param_callback_handle_ = this->add_on_set_parameters_callback(
+        [this](const std::vector<rclcpp::Parameter> &parameters)
+        {
+          rcl_interfaces::msg::SetParametersResult result;
+          result.successful = true;
+          for (const auto &param : parameters)
+          {
+            if (param.get_name() == "min_lookahead" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              min_lookahead_ = param.as_double();
+            }
+            else if (param.get_name() == "max_lookahead" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              max_lookahead_ = param.as_double();
+            }
+            else if (param.get_name() == "wheelbase" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              wheelbase_ = param.as_double();
+            }
+            else if (param.get_name() == "max_steering_angle" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              max_steering_angle_ = param.as_double();
+            }
+            else if (param.get_name() == "min_speed" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              min_speed_ = param.as_double();
+            }
+            else if (param.get_name() == "max_speed" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              max_speed_ = param.as_double();
+            }
+          }
+          return result;
+        });
 
     drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(
         this->get_parameter("drive_topic").as_string(), 10);
@@ -112,6 +139,31 @@ private:
         "Received raceline with %zu points, closed length %.2f m",
         raceline_.size(),
         pure_pursuit::computeClosedTrackLength(raceline_));
+
+    if (!raceline_.empty())
+    {
+      // initialize to the first point's velocity
+      min_mps_ = raceline_.front().vx_mps;
+      max_mps_ = raceline_.front().vx_mps;
+
+      // find the min and max velocities in the newly received raceline
+      for (const auto &point : raceline_)
+      {
+        if (point.vx_mps < min_mps_)
+        {
+          min_mps_ = point.vx_mps;
+        }
+        if (point.vx_mps > max_mps_)
+        {
+          max_mps_ = point.vx_mps;
+        }
+      }
+
+      RCLCPP_INFO_ONCE(
+          this->get_logger(),
+          "Raceline speed limits (MPS, not real values! For real set 'min_speed' and 'max_speed'): Min = %.2f m/s, Max = %.2f m/s",
+          min_mps_, max_mps_);
+    }
   }
 
   void controlTimerCallback()
@@ -142,14 +194,14 @@ private:
 
     const std::size_t nearest_index =
         pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y);
-    const double lookahead_m = pure_pursuit::computeSpeedDependentLookahead(
+
+    const double lookahead_m = pure_pursuit::computeMpsDependentLookahead(
+        min_mps_,
+        max_mps_,
         raceline_[nearest_index].vx_mps,
-        this->get_parameter("min_lookahead").as_double(),
-        this->get_parameter("max_lookahead").as_double(),
-        this->get_parameter("lookahead_gain").as_double(),
-        this->get_parameter("min_target_speed").as_double(),
-        this->get_parameter("max_target_speed").as_double()
-      );
+        min_lookahead_,
+        max_lookahead_);
+
     std::size_t goal_index =
         pure_pursuit::findLookaheadPointIndex(raceline_, nearest_index, lookahead_m);
 
@@ -182,24 +234,18 @@ private:
     const double steering_angle = pure_pursuit::computePurePursuitSteering(
         goal_base.point.x,
         goal_base.point.y,
-        this->get_parameter("wheelbase").as_double(),
-        this->get_parameter("max_steering_angle").as_double());
+        wheelbase_,
+        max_steering_angle_);
 
-    double target_speed = raceline_[goal_index].vx_mps *
-                          this->get_parameter("target_speed_scaling").as_double();
-    target_speed = pure_pursuit::computeCurvatureLimitedSpeed(
-        target_speed,
-        raceline_[goal_index].kappa_radpm,
-        this->get_parameter("curvature_speed_gain").as_double(),
-        this->get_parameter("min_target_speed").as_double());
-    target_speed = std::clamp(
-        target_speed,
-        this->get_parameter("min_target_speed").as_double(),
-        this->get_parameter("max_target_speed").as_double());
+    double target_speed = pure_pursuit::computeMpsDependentSpeed(
+        min_mps_,
+        max_mps_,
+        raceline_[nearest_index].vx_mps,
+        min_speed_,
+        max_speed_);
 
     publishMarkers(goal_map, nearest_index, car_x, car_y);
     publishDrive(steering_angle, target_speed);
-    
   }
 
   void publishMarkers(
@@ -249,10 +295,23 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr car_pub_;
 
+  // Callback handle to keep the parameter event listener alive
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
+
   std::vector<pure_pursuit::RacelinePoint> raceline_;
   std::string map_frame_;
   std::string base_frame_;
   double current_speed_mps_ = 0.0;
+  double min_mps_ = -1.0;
+  double max_mps_ = -1.0;
+
+  // Cached parameters
+  double min_lookahead_;
+  double max_lookahead_;
+  double wheelbase_;
+  double max_steering_angle_;
+  double min_speed_;
+  double max_speed_;
 };
 
 int main(int argc, char **argv)
