@@ -1,0 +1,7 @@
+image: craziest_map_2_no_bridge.pgm
+mode: trinary
+resolution: 0.025
+origin: [-8.204, -1.881, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
