@@ -62,6 +62,12 @@ class Strategist(Node):
             10,
         )
 
+        self.car_indicator_pub = self.create_publisher(
+            Marker,
+            "/strategist/car_indicator",
+            10,
+        )
+
         self.strategy_pub = self.create_publisher(
             String,
             "/strategist/strategy",
@@ -73,7 +79,7 @@ class Strategist(Node):
         self.get_logger().info(f"Loading strategies from: {map_strategy_path}")
 
         with open(map_strategy_path, "r") as f:
-            for line in [l for l in f.readlines() if l.strip() != ""]:
+            for line in [line_ for line_ in f.readlines() if line_.strip() != ""]:
                 parts = line.strip().split(",")
 
                 if len(parts) != 5:
@@ -94,6 +100,29 @@ class Strategist(Node):
             raise ValueError("No checkpoints found in strategy file.")
 
         self.get_logger().info(f"Loaded {len(self.checkpoints)} strategy checkpoints.")
+
+        # Assign a distinct color to each unique strategy
+        unique_strategies = list(
+            dict.fromkeys([cp["strategy"] for cp in self.checkpoints])
+        )
+
+        # A visually distinct color palette (R, G, B)
+        palette = [
+            (1.0, 0.0, 0.0),  # Red
+            (0.0, 0.5, 1.0),  # Blue
+            (1.0, 1.0, 0.0),  # Yellow
+            (1.0, 0.0, 1.0),  # Magenta
+            (0.0, 1.0, 1.0),  # Cyan
+            (1.0, 0.5, 0.0),  # Orange
+            (0.5, 0.0, 1.0),  # Purple
+            (0.0, 1.0, 0.0),  # Green
+            (1.0, 0.5, 0.5),  # Pink
+            (0.5, 0.5, 1.0),  # Light Blue
+        ]
+
+        self.strategy_colors = {}
+        for i, strat in enumerate(unique_strategies):
+            self.strategy_colors[strat] = palette[i % len(palette)]
 
         # 5. State Variables
         self.target_index = 0
@@ -137,16 +166,15 @@ class Strategist(Node):
             if self.intersects(
                 self.prev_pos, curr_pos, target_cp["p1"], target_cp["p2"]
             ):
-
                 # Update current strategy and print it
                 self.current_strategy = target_cp["strategy"]
-                self.get_logger().info(
-                    f"🟥 STRATEGY UPDATED: {self.current_strategy} (Crossed line {self.target_index})"
-                )
+                self.get_logger().info(f"🟥 STRATEGY UPDATED: {self.current_strategy}")
 
                 self.advance_target()
 
         self.prev_pos = curr_pos
+
+        self.publish_car_indicator()
 
     def advance_target(self):
         self.target_index += 1
@@ -165,6 +193,45 @@ class Strategist(Node):
         msg.data = self.current_strategy
         self.strategy_pub.publish(msg)
 
+    def publish_car_indicator(self):
+        """Publishes a sphere directly over the car reflecting the active strategy color."""
+        marker = Marker()
+
+        # Anchor the marker to the car's base frame.
+        # RViz will automatically move it with the car.
+        marker.header.frame_id = self.base_frame
+        marker.header.stamp = self.get_clock().now().to_msg()
+
+        marker.ns = "car_strategy_indicator"
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+
+        # Position it directly above the base_link
+        marker.pose.position.x = 0.3
+        marker.pose.position.y = 0.0
+        marker.pose.position.z = 0.15
+
+        # Proper quaternion initialization
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+
+        # Define the size of the sphere
+        marker.scale.x = 0.2
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+
+        # Assign the current strategy's color
+        r, g, b = self.strategy_colors[self.current_strategy]
+        marker.color.r = r
+        marker.color.g = g
+        marker.color.b = b
+        marker.color.a = 1.0  # Fully opaque
+
+        self.car_indicator_pub.publish(marker)
+
     def publish_markers(self):
         """Generates and publishes RViz lines and text for the strategy checkpoints."""
         marker_array = MarkerArray()
@@ -179,22 +246,15 @@ class Strategist(Node):
             line_marker.type = Marker.LINE_STRIP
             line_marker.action = Marker.ADD
 
-            # Line width thickness
             line_marker.scale.x = 0.15
 
-            # Color configuration (Highlight current target line)
-            if i == self.target_index:
-                # Bright Green for the Active Target Line
-                line_marker.color.r = 0.0
-                line_marker.color.g = 1.0
-                line_marker.color.b = 0.0
-                line_marker.color.a = 1.0
-            else:
-                # Cyan/Blue for Inactive Checkpoints
-                line_marker.color.r = 0.0
-                line_marker.color.g = 0.6
-                line_marker.color.b = 1.0
-                line_marker.color.a = 0.8
+            # Apply the specific color for this strategy
+            r, g, b = self.strategy_colors[cp["strategy"]]
+            line_marker.color.r = r
+            line_marker.color.g = g
+            line_marker.color.b = b
+
+            line_marker.color.a = 0.6
 
             # Define line endpoints
             p1 = Point(x=cp["p1"][0], y=cp["p1"][1], z=0.0)
@@ -220,13 +280,11 @@ class Strategist(Node):
             text_marker.pose.position.y = float(mid_y)
             text_marker.pose.position.z = 0.1
 
-            # Set text scale (height of the uppercase letters)
             text_marker.scale.z = 0.2
 
-            # Make text pure white
-            text_marker.color.r = 1.0
-            text_marker.color.g = 1.0
-            text_marker.color.b = 1.0
+            text_marker.color.r = 0.0
+            text_marker.color.g = 0.0
+            text_marker.color.b = 0.0
             text_marker.color.a = 1.0
 
             # Set the text to the strategy name from the file

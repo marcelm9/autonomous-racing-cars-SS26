@@ -55,18 +55,18 @@ def generate_launch_description():
                     }
                 ],
             ),
-            # Node(
-            #     package="lap_timer",
-            #     executable="lap_timer",
-            #     name="lap_timer_node",
-            #     output="screen",
-            #     parameters=[
-            #         {
-            #             "map_name": map_name,
-            #             "base_frame": "ego_racecar/base_link",
-            #         }
-            #     ],
-            # ),
+            Node(
+                package="lap_timer",
+                executable="lap_timer",
+                name="lap_timer_node",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "ego_racecar/base_link",
+                    }
+                ],
+            ),
             Node(
                 package="strategist",
                 executable="strategist",
