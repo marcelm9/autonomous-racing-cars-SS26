@@ -6,6 +6,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <iostream>
 #include <unordered_map>
 
 namespace pure_pursuit
@@ -253,11 +254,18 @@ std::size_t findLookaheadPointIndex(
   }
 
   double target_s_m = raceline[nearest_index].s_m + lookahead_m;
+
+  // std::cout << "  " << std::endl;
+  // std::cout << "raceline[nearest_index].s_m: " << raceline[nearest_index].s_m << std::endl;
+  // std::cout << "lookahead_m: " << lookahead_m << std::endl;
+  // std::cout << "target_s_m: " << target_s_m << std::endl;
+  
   target_s_m = std::fmod(target_s_m - raceline.front().s_m, track_length_m) + raceline.front().s_m;
 
   if (target_s_m >= raceline[nearest_index].s_m) {
     for (std::size_t i = nearest_index; i < raceline.size(); ++i) {
       if (raceline[i].s_m >= target_s_m) {
+        // std::cout << "raceline[i].s_m: " << raceline[i].s_m << std::endl;
         return i;
       }
     }
@@ -265,6 +273,7 @@ std::size_t findLookaheadPointIndex(
 
   for (std::size_t i = 0; i <= nearest_index && i < raceline.size(); ++i) {
     if (raceline[i].s_m >= target_s_m) {
+      // std::cout << "raceline[i].s_m: " << raceline[i].s_m << std::endl;
       return i;
     }
   }
@@ -276,10 +285,58 @@ double computeSpeedDependentLookahead(
   double current_speed_mps,
   double min_lookahead_m,
   double max_lookahead_m,
+  double lookahead_gain,
+  double min_target_speed,
+  double max_target_speed)
+{
+  double unclamped = min_lookahead_m + lookahead_gain * std::max(0.0, current_speed_mps);
+
+  //const double m = (max_target_speed) / (max_target_speed*max_target_speed) ;
+  //unclamped = m * current_speed_mps * current_speed_mps;
+
+  std::cout << "current_speed_mps: " << current_speed_mps << std::endl;
+  std::cout << "unclamped: " << unclamped << std::endl;
+  return std::clamp(unclamped, min_lookahead_m, max_lookahead_m);
+}
+
+
+int computeCurvatureDependentLookahead(
+  std::vector<pure_pursuit::RacelinePoint> raceline,
+  int nearest_index,
+  double min_lookahead_m,
+  double max_lookahead_m,
   double lookahead_gain)
 {
-  const double unclamped = min_lookahead_m + lookahead_gain * std::max(0.0, current_speed_mps);
-  return std::clamp(unclamped, min_lookahead_m, max_lookahead_m);
+
+  int min_idx = pure_pursuit::findLookaheadPointIndex(raceline, nearest_index, min_lookahead_m);
+  int max_idx = pure_pursuit::findLookaheadPointIndex(raceline, nearest_index, max_lookahead_m);
+
+  double min_kappa_radpm = 0;
+  double max_kappa_radpm = 1.5;
+
+  int raceline_length = raceline.size();
+  raceline[nearest_index];
+  int i = nearest_index;
+
+  double delta_distance = raceline[1].s_m - raceline[0].s_m;
+  double distance = 0;
+
+  while (true) {
+
+    i += 1;
+    distance += delta_distance;
+    
+    if (distance > max_lookahead_m) { break; }
+    if (distance < min_lookahead_m) { continue; } 
+
+    // handle wrap around
+    if (i >= raceline_length) { i = 0;}
+
+    // iterate forward untill a strong enough curve is found
+    if (std::abs(raceline[i].kappa_radpm) > max_kappa_radpm * lookahead_gain) { break; }
+  }
+  std::cout << "current lookahaed distance: " << distance << " index: " << i << std::endl;
+  return i;
 }
 
 double computePurePursuitSteering(

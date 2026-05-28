@@ -11,6 +11,7 @@ from rclpy.node import Node
 from msgs.msg import Raceline, RacelinePoint
 from nav_msgs.msg import Path as PathMsg
 from geometry_msgs.msg import PoseStamped
+from visualization_msgs.msg import Marker, MarkerArray
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -43,6 +44,8 @@ class RacelineCsvPublisher(Node):
         self.declare_parameter("publish_rate", 1.0)
 
         self.csv_path = self.resolve_csv_path(self.get_parameter("map_name").value)
+        self.get_logger().info(f"Resolved raceline CSV path: {self.csv_path}")
+        
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
 
@@ -57,6 +60,8 @@ class RacelineCsvPublisher(Node):
             "/raceline/path",
             10,
         )
+        
+        self.speed_marker_pub = self.create_publisher(MarkerArray, "/raceline/speed_markers", 10)
 
         try:
             self.raceline_msg = self.load_raceline_csv(self.csv_path)
@@ -214,9 +219,50 @@ class RacelineCsvPublisher(Node):
 
         for pose in self.path_msg.poses:
             pose.header.stamp = stamp
+            
+        speed_marker_array = self.create_speed_marker_array(self.raceline_msg, stamp)
 
         self.raceline_pub.publish(self.raceline_msg)
         self.path_pub.publish(self.path_msg)
+        self.speed_marker_pub.publish(speed_marker_array)
+        
+        
+    def create_speed_marker_array(self, raceline_msg: Raceline, stamp) -> MarkerArray:
+        marker_array = MarkerArray()
+
+        delete_marker = Marker()
+        delete_marker.action = Marker.DELETEALL
+        marker_array.markers.append(delete_marker)
+
+        step = 30
+        marker_id = 0
+
+        for i, point in enumerate(raceline_msg.points):
+            if i % step != 0:
+                continue
+
+            marker = Marker()
+            marker.header.frame_id = self.frame_id
+            marker.header.stamp = stamp
+            marker.ns = "raceline_speed"
+            marker.id = marker_id
+            marker.type = Marker.TEXT_VIEW_FACING
+            marker.action = Marker.ADD
+            marker.pose.position.x = point.x_m
+            marker.pose.position.y = point.y_m
+            marker.pose.position.z = 0.25
+            marker.pose.orientation.w = 1.0
+            marker.scale.z = 0.18
+            marker.color.r = 1.0
+            marker.color.g = 1.0
+            marker.color.b = 1.0
+            marker.color.a = 1.0
+            marker.text = f"{point.vx_mps:.1f}"
+
+            marker_array.markers.append(marker)
+            marker_id += 1
+
+        return marker_array
 
 
 def main(args=None):

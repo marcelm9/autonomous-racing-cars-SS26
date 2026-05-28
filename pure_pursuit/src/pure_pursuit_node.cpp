@@ -143,12 +143,17 @@ private:
     const std::size_t nearest_index =
         pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y);
     const double lookahead_m = pure_pursuit::computeSpeedDependentLookahead(
-        current_speed_mps_,
+        raceline_[nearest_index].vx_mps,
         this->get_parameter("min_lookahead").as_double(),
         this->get_parameter("max_lookahead").as_double(),
-        this->get_parameter("lookahead_gain").as_double());
-    const std::size_t goal_index =
+        this->get_parameter("lookahead_gain").as_double(),
+        this->get_parameter("min_target_speed").as_double(),
+        this->get_parameter("max_target_speed").as_double()
+      );
+    std::size_t goal_index =
         pure_pursuit::findLookaheadPointIndex(raceline_, nearest_index, lookahead_m);
+
+    // std::size_t goal_index = computeCurvatureDependentLookahead(raceline_, nearest_index, this->get_parameter("min_lookahead").as_double(), this->get_parameter("max_lookahead").as_double(), this->get_parameter("lookahead_gain").as_double());
 
     geometry_msgs::msg::PointStamped goal_map;
     goal_map.header.frame_id = map_frame_;

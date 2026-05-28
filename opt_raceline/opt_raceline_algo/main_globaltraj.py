@@ -604,3 +604,42 @@ helper_funcs_glob.src.result_plots.result_plots(plot_opts=plot_opts,
 with open(file_paths["lane_optimal_export"], 'w') as f:
     for x, y, v in zip(trajectory_opt[:, 1], trajectory_opt[:, 2], trajectory_opt[:, 5]):
         f.write("%.3f,%.3f,%.3f\n" % (x, y, v))
+        
+
+# ----------------------------------------------------------------------------------------------------------------------
+# EXPORT traj_race_cl TO CSV FOR launch_orchestrator/maps --------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+import numpy as np
+import uuid
+import hashlib
+
+# define output paths
+output_dir = "./../../launch_orchestrator/maps"
+os.makedirs(output_dir, exist_ok=True)
+output_file = os.path.join(output_dir, "craziest_map_no_bridge.csv")
+
+# create random UUID
+rand_uuid = str(uuid.uuid4())
+
+# optional: hash a ggv file if you have one
+ggv_file_path = file_paths.get("ggv_file", None)
+if ggv_file_path and os.path.isfile(ggv_file_path):
+    with open(ggv_file_path, 'br') as fh:
+        ggv_content = fh.read()
+else:
+    ggv_content = np.array([])
+ggv_hash = hashlib.sha1(ggv_content).hexdigest()
+
+# write UUID and GGV hash into file
+with open(output_file, 'w') as fh:
+    fh.write("# " + rand_uuid + "\n")
+    fh.write("# " + ggv_hash + "\n")
+
+# export traj_race_cl
+header = "s_m; x_m; y_m; psi_rad; kappa_radpm; vx_mps; ax_mps2"
+fmt = "%.7f; %.7f; %.7f; %.7f; %.7f; %.7f; %.7f"
+with open(output_file, 'ab') as fh:
+    np.savetxt(fh, traj_race_cl, fmt=fmt, header=header)
+
+print(f"INFO: Exported traj_race_cl to {output_file}")

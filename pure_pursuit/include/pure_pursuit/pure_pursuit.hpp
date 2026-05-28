@@ -37,6 +37,15 @@ double computeSpeedDependentLookahead(
   double current_speed_mps,
   double min_lookahead_m,
   double max_lookahead_m,
+  double lookahead_gain,
+  double min_target_speed,
+  double max_target_speed);
+
+int computeCurvatureDependentLookahead(
+  std::vector<pure_pursuit::RacelinePoint> raceline,
+  int nearest_index,
+  double min_lookahead_m,
+  double max_lookahead_m,
   double lookahead_gain);
 
 double computePurePursuitSteering(
@@ -50,6 +59,10 @@ double computeCurvatureLimitedSpeed(
   double curvature_radpm,
   double curvature_speed_gain,
   double min_speed_mps);
+
+
+
+
 
 }  // namespace pure_pursuit
 
