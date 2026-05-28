@@ -67,5 +67,17 @@ def generate_launch_description():
                     }
                 ],
             ),
+            Node(
+                package="strategist",
+                executable="strategist",
+                name="strategist",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "ego_racecar/base_link",
+                    }
+                ],
+            ),
         ]
     )
