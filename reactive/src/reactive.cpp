@@ -22,9 +22,22 @@ FollowGap::FollowGap() : Node("reactive")
       std::bind(&FollowGap::diag_timer_callback, this));
 
   // variables
-  this->declare_parameter<double>("max_speed", 3.0);
-  this->declare_parameter<int>("reac_n_extend", 15);
-  this->declare_parameter<double>("reac_step_depth", 0.1);
+  this->declare_parameter<double>("max_speed", this->MAXDRIVESPEED);
+  this->declare_parameter<double>("min_speed", this->MINDRIVESPEED);
+  this->declare_parameter<int>("reac_n_extend", this->N_EXTEND);
+  this->declare_parameter<double>("reac_step_depth", this->STEP_DEPTH);
+  this->declare_parameter<double>("continuity_weight", this->CONTINUITY_WEIGHT);
+
+  // Initialize from parameters
+  this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("min_speed", this->MINDRIVESPEED);
+  this->get_parameter("reac_n_extend", this->N_EXTEND);
+  this->get_parameter("reac_step_depth", this->STEP_DEPTH);
+  this->get_parameter("continuity_weight", this->CONTINUITY_WEIGHT);
+
+  // Register the dynamic parameter callback
+  callback_handle_ = this->add_on_set_parameters_callback(
+      std::bind(&FollowGap::parameters_callback, this, std::placeholders::_1));
 }
 
 /* ---- CALLBACKS ---- */
@@ -39,28 +52,39 @@ void FollowGap::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr odom
   this->odom_msg = *odom_msg;
 }
 
-void FollowGap::parameter_callback(const std::vector<std::string> &changed_parameters)
+rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const std::vector<rclcpp::Parameter> &parameters)
 {
-    for (const auto & param_name : changed_parameters) {
-        if (param_name == "max_speed") {
-            this->get_parameter("max_speed", this->MAXDRIVESPEED);
+    rcl_interfaces::msg::SetParametersResult result;
+    result.successful = true;
+    result.reason = "success";
+
+    for (const auto &param : parameters)
+    {
+        if (param.get_name() == "max_speed") {
+            this->MAXDRIVESPEED = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'max_speed' updated to: %.2f", this->MAXDRIVESPEED);
         }
-        if (param_name == "reac_n_extend") {
-            this->get_parameter("reac_n_extend", this->n_extend);
+        else if (param.get_name() == "min_speed") { // Handle dynamic updates for min_speed
+            this->MINDRIVESPEED = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'min_speed' updated to: %.2f", this->MINDRIVESPEED);
         }
-        if (param_name == "reac_step_depth") {
-            this->get_parameter("reac_step_depth", this->step_depth);
+        else if (param.get_name() == "continuity_weight") {
+            this->CONTINUITY_WEIGHT = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'continuity_weight' updated to: %.2f", this->CONTINUITY_WEIGHT);
+        }
+        else if (param.get_name() == "reac_n_extend") {
+            this->N_EXTEND = param.as_int();
+        }
+        else if (param.get_name() == "reac_step_depth") {
+            this->STEP_DEPTH = param.as_double();
         }
     }
+    return result;
 }
 
 void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr scan_msg)
 {
   this->scan_msg = *scan_msg;
-
-  this->get_parameter("max_speed", this->MAXDRIVESPEED);
-  this->get_parameter("reac_n_extend", this->n_extend);
-  this->get_parameter("reac_step_depth", this->step_depth);
 
   double angle_increment = scan_msg->angle_increment;
   double angle_min = scan_msg->angle_min;
@@ -72,12 +96,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (float r : raw_ranges) {
     ranges_cleaned.push_back(std::isfinite(r) ? r : scan_msg->range_max);
   }
-  std::vector<float> ranges_smoothed = this->preprocess_scan(ranges_cleaned);
+  std::vector<float> ranges = this->preprocess_scan(ranges_cleaned);
 
   //// DISPARITY EXTENSION ////
 
   std::vector<float> extended_ranges;
-  this->disparity_extender(ranges_smoothed, this->n_extend, this->step_depth, extended_ranges);
+  std::vector<int> extended_ranges_mask; // 1 if the range was extended to right , 2 if extended to left, 0 if original
+  this->disparity_extender(ranges, N_EXTEND, STEP_DEPTH, extended_ranges, extended_ranges_mask);
 
   //// DYNAMIC GAP SEARCH ////
   // look for a gap far away and if none is found reduce the distance until a gap is found
@@ -85,7 +110,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   for (int i = 0; i < this->DYN_THRESHOLD_INCREMENT; i++)
   {
     double threshold = this->MAX_THRESHOLD - (this->MAX_THRESHOLD - this->MIN_THRESHOLD) * i / this->DYN_THRESHOLD_INCREMENT;
-    this->find_gaps_by_threshold(extended_ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
+    this->find_gaps_by_threshold(ranges, threshold, angle_min, angle_increment, all_gaps, gap_angles);
     if (!gap_angles.empty())
     {
       this->diag_active_threshold = threshold; // Save for diagnostics
@@ -98,6 +123,8 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   //// STEERING WITH WALL AVOIDANCE////
   // Steer to best gap using continuity scoring
+
+  double chosen_gap_dist = 0.0; // Track the distance of the selected gap for dynamic speed
 
   if (!all_gaps.empty())
   {
@@ -130,11 +157,11 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
       if (score > best_score) {
         best_score = score;
         best_angle = gap_angle;
+        chosen_gap_dist = avg_dist;
       }
     }
 
     this->goal_angle = best_angle;
-    this->last_goal_angle = best_angle;
 
     if (oh_no_im_stuck)
     {
@@ -159,7 +186,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->goal_angle = 0;
   }
 
-  std::vector<float> &ranges = ranges_smoothed; // use smoothed ranges for wall avoidance
   double min_distance = std::numeric_limits<float>::infinity();
   int idx_closest_right = -1;
   int idx_closest_left = -1;
@@ -254,7 +280,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->diag_dist_closest_right = this->closest_dist_right;
   } else {
     this->closest_idx_right = -1;
-    this->diag_dist_closest_right = this->MAX_DIST_STEER;
   }
 
   if (idx_closest_left >= 0) {
@@ -264,7 +289,6 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     this->diag_dist_closest_left = this->closest_dist_left;
   } else {
     this->closest_idx_left = -1;
-    this->diag_dist_closest_left = this->MAX_DIST_STEER;
   }
 
   this->diag_correction_left = correction_left;
@@ -273,7 +297,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   this->goal_angle_before_width_clamp = this->goal_angle; // Save for visualization
 
   // Geometric safety: ensure we steer far enough to clear the car's width
-  const double half_car_width = 6*0.2032 / 2.0; // approx 0.4m
+  const double half_car_width = 0*6*0.2032 / 2.0; // approx 0.4m
 
   if (idx_closest_right >= 0)
   {
@@ -290,6 +314,38 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   this->goal_angle_before_steer_clamp = this->goal_angle; // Save for visualization
+
+  // if goal angle is within an area which is extended by the disparity extender, push angle to edge of extention area
+  int goal_angle_ray_index = static_cast<int>((this->goal_angle - angle_min) / angle_increment);
+
+  // check if goal angle is within extended area
+  if(goal_angle_ray_index >= 0 && goal_angle_ray_index < extended_ranges.size() && extended_ranges_mask[goal_angle_ray_index] >> 0)
+  {
+    // push the goal angle away from that wall by at least the number of rays it was extended
+    if (extended_ranges_mask[goal_angle_ray_index] == 1) // 1 -> extended to right side
+    {
+      // right side, push right until mask is 0
+      // find how many rays to go right
+       int new_goal_index = goal_angle_ray_index;
+       while (new_goal_index < extended_ranges_mask.size() && extended_ranges_mask[new_goal_index] == 1)
+       {
+         new_goal_index++;
+       }
+       this->goal_angle = new_goal_index * angle_increment + angle_min; 
+    }
+    else // mask is 2 -> extended to left side
+    {
+      // left side, push left until mask is 0
+      // find how many rays to go left
+       int new_goal_index = goal_angle_ray_index;
+       while (new_goal_index >= 0 && extended_ranges_mask[new_goal_index] == 2)
+       {
+         new_goal_index--;
+       }
+       this->goal_angle = new_goal_index * angle_increment + angle_min;
+    }
+  }
+
 
   const double STEER_LIMIT = 0.2;
 
@@ -312,29 +368,40 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   //// SPEED ////
 
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
+  this->get_parameter("min_speed", this->MINDRIVESPEED);
 
-  // Set the speed depending on the open space in front of the car
-  min_distance = std::numeric_limits<float>::infinity();
-  int idx_closest_front;
-
-  // front side
+  // Keep front-distance check purely for diagnostic visualization
+  float min_front_distance = std::numeric_limits<float>::infinity();
   for (int i = num_lasers / 2 - 10; i < num_lasers / 2 + 10; i++)
   {
-    if (ranges[i] < min_distance)
+    if (ranges[i] < min_front_distance)
     {
-      // find smallest range
-      min_distance = ranges[i];
-      idx_closest_front = i;
+      min_front_distance = ranges[i];
     }
   }
+  this->diag_dist_closest_front = min_front_distance; // Save for diagnostics
 
-  this->diag_dist_closest_front = min_distance; // Save for diagnostics
+  // Angle Factor: Slow down as steering angle increases
+  double max_steering_angle = 0.41; // Using your clamp limit
+  double angle_penalty = std::min(std::abs(this->goal_angle) / max_steering_angle, 1.0);
+  double angle_factor = 1.0 - angle_penalty; // 1.0 = straight, 0.0 = full lock
 
-  double speed_factor;
-  
-  speed_factor = 1 - std::exp(-(this->BRAKE_TUNE) * (min_distance-0.01)); // offset exp by 0.1 so min value is above 0
+  // Distance Factor: Normalize chosen gap depth (0.0 = close, 1.0 = max depth)
+  double distance_factor = 0.0;
+  if (this->MAX_THRESHOLD > 0.0) {
+    distance_factor = std::min(chosen_gap_dist / this->MAX_THRESHOLD, 1.0);
+  }
 
-  double set_speed = this->MAXDRIVESPEED * speed_factor;
+  // Combine both factors to determine optimal speed multiplier [0.0, 1.0]
+  double speed_factor = distance_factor * angle_factor;
+
+  // Force speed multiplier to 0 if the robot is stuck
+  if (oh_no_im_stuck) {
+    speed_factor = 0.0;
+  }
+
+  // Scale the multiplier into the settable Minimum and Maximum speeds
+  double set_speed = this->MINDRIVESPEED + (speed_factor * (this->MAXDRIVESPEED - this->MINDRIVESPEED));
   this->diag_set_speed = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
@@ -405,11 +472,13 @@ void FollowGap::disparity_extender(
     const std::vector<float> &ranges,
     int n_extend,
     float step_depth,
-    std::vector<float> &out_extended_ranges
+    std::vector<float> &out_extended_ranges,
+    std::vector<int> &out_extended_ranges_mask
 )
 {
   int num_lasers = ranges.size();
   out_extended_ranges = ranges; // Initialize with original ranges
+  out_extended_ranges_mask = std::vector<int>(num_lasers, 0); // Initialize mask 
 
   // Iterate through adjacent pairs of rays
   for (int i = 0; i < num_lasers - 1; i++)
@@ -434,7 +503,10 @@ void FollowGap::disparity_extender(
         
         for (int j = i + 1; j <= std::min(num_lasers - 1, i + current_n); j++)
         {
-          out_extended_ranges[j] = std::min(out_extended_ranges[j], r1);
+          if (r1 < out_extended_ranges[j]) {
+            out_extended_ranges[j] = r1;
+            out_extended_ranges_mask[j] = 1; // extended to the right
+          }
         }
       }
       else
@@ -447,7 +519,10 @@ void FollowGap::disparity_extender(
         // Overwrite the previous 'current_n' indices to the left.
         for (int j = i; j >= std::max(0, i + 1 - current_n); j--)
         {
-          out_extended_ranges[j] = std::min(out_extended_ranges[j], r2);
+          if (r2 < out_extended_ranges[j]) {
+            out_extended_ranges[j] = r2;
+            out_extended_ranges_mask[j] = 2; // extended to the left
+          }
         }
       }
     }
@@ -508,7 +583,7 @@ void FollowGap::find_gaps_by_threshold(
     {
       // end of Gap
 
-      if (min_count > this->n_gaphits && longest_ray_in_gap > longest_gap)
+      if (min_count > this->N_GAP_HITS && longest_ray_in_gap > longest_gap)
       {
         // new best gap
         out_best_gap = temp_angles;
@@ -516,7 +591,7 @@ void FollowGap::find_gaps_by_threshold(
       }
 
       // safe as a found gap
-      if (!temp_angles.empty() && min_count > this->n_gaphits)
+      if (!temp_angles.empty() && min_count > this->N_GAP_HITS)
         out_all_gaps.push_back(temp_angles);
 
       // reset temporary values for next gap
@@ -527,7 +602,7 @@ void FollowGap::find_gaps_by_threshold(
   }
 
   // edge case: scan ends with a gap still "open"
-  if (!temp_angles.empty() && min_count > this->n_gaphits)
+  if (!temp_angles.empty() && min_count > this->N_GAP_HITS)
   {
     out_all_gaps.push_back(temp_angles);
     if (longest_ray_in_gap > longest_gap)
