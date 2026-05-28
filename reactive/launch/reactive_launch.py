@@ -32,24 +32,7 @@ def generate_launch_description():
         default_value='/drive',
         description='Topic name for drive commands'
     )
-    
-    max_speed_arg = DeclareLaunchArgument(
-        'max_speed',
-        default_value='20.0',
-        description='Maximum driving speed'
-    )
-    
-    reac_n_extend_arg = DeclareLaunchArgument(
-        'reac_n_extend',
-        default_value='15',
-        description='Number of steps to extend obstacles'
-    )
-    
-    reac_step_depth_arg = DeclareLaunchArgument(
-        'reac_step_depth',
-        default_value='0.1',
-        description='Depth of each step when extending obstacles'
-    )
+
 
     pkg_f1tenth_gym_ros = get_package_share_directory('f1tenth_gym_ros')
     
@@ -66,11 +49,7 @@ def generate_launch_description():
         executable='reactive',
         name='reactive',
         output='screen',
-        parameters=[{
-            'max_speed': LaunchConfiguration('max_speed'),
-            'reac_n_extend': LaunchConfiguration('reac_n_extend'),
-            'reac_step_depth': LaunchConfiguration('reac_step_depth')
-        }],
+        parameters=[{}],
         remappings=[
             ('/scan', LaunchConfiguration('scan_topic')), 
             ('/odom', LaunchConfiguration('odom_topic')),
@@ -83,9 +62,6 @@ def generate_launch_description():
         scan_topic_arg,
         odom_topic_arg,
         drive_topic_arg,
-        max_speed_arg,
-        reac_n_extend_arg,
-        reac_step_depth_arg,
 
         sim_launch,
         reactive
