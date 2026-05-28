@@ -81,6 +81,10 @@ public:
             {
               max_speed_ = param.as_double();
             }
+            else if (param.get_name() == "do_adaptive_speed_control" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+            {
+              do_adaptive_speed_control_ = param.as_bool();
+            }
           }
           return result;
         });
@@ -160,6 +164,10 @@ private:
         }
       }
 
+
+      std::vector<double> err_hist(raceline_.size(), 0.0); 
+      raceline_error_history = err_hist;
+
       RCLCPP_INFO_ONCE(
           this->get_logger(),
           "Raceline speed limits (MPS, not real values! For real set 'min_speed' and 'max_speed'): Min = %.2f m/s, Max = %.2f m/s",
@@ -167,6 +175,8 @@ private:
     }
   }
 
+
+  // CONTROLLER CALLBACK
   void controlTimerCallback()
   {
     if (raceline_.empty())
@@ -190,6 +200,7 @@ private:
       return;
     }
 
+
     const double car_x = map_to_base.transform.translation.x;
     const double car_y = map_to_base.transform.translation.y;
 
@@ -205,6 +216,26 @@ private:
 
     std::size_t goal_index =
         pure_pursuit::findLookaheadPointIndex(raceline_, nearest_index, lookahead_m);
+
+
+
+    // automatic adaptive tune of speed
+    if (do_adaptive_speed_control_) {
+
+      // check error value
+      double err = raceline_error_history[nearest_index];
+      double factor = 1.0;
+      if (err < 0.05) {
+        
+      } else if (err > 10) {
+
+      } else {
+        factor = 1.0;
+      }
+
+      raceline_[nearest_index].vx_mps = raceline_[nearest_index].vx_mps * factor;
+    }
+
 
     // std::size_t goal_index = computeCurvatureDependentLookahead(raceline_, nearest_index, this->get_parameter("min_lookahead").as_double(), this->get_parameter("max_lookahead").as_double(), this->get_parameter("lookahead_gain").as_double());
 
@@ -248,7 +279,11 @@ private:
     publishMarkers(goal_map, nearest_index, car_x, car_y);
     publishDrive(steering_angle, target_speed);
 
-    // log Pos Error
+    // ---- log Pos Error ----
+    
+    // calc error
+    double err = std::hypot(raceline_[nearest_index].x_m - car_x, raceline_[nearest_index].y_m - car_y);
+    raceline_error_history[nearest_index] = err;
     
   }
 
@@ -319,6 +354,7 @@ private:
   double max_steering_angle_;
   double min_speed_;
   double max_speed_;
+  bool do_adaptive_speed_control_ = false;
 };
 
 int main(int argc, char **argv)
