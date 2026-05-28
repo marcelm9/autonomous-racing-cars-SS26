@@ -44,14 +44,15 @@ def generate_launch_description():
                         "drive_topic": "ego_racecar/drive",
                         "odom_topic": "ego_racecar/odom",
                         "min_lookahead": 0.3,
-                        "max_lookahead": 2.0,
+                        "max_lookahead": 3.0,
                         "lookahead_gain": 0.2,
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
                         "target_speed_scaling": 1.0,
-                        "min_target_speed": 0.5,
-                        "max_target_speed": 5.0,
+                        "min_speed": 0.5,
+                        "max_speed": 7.0,
                         "curvature_speed_gain": -0.2,
+                        "do_adaptive_speed_control": False,
                     }
                 ],
             ),
@@ -69,3 +70,5 @@ def generate_launch_description():
             ),
         ]
     )
+
+

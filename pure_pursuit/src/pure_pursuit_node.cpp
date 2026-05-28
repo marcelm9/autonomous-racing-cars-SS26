@@ -17,6 +17,8 @@
 #include "tf2_ros/buffer.hpp"
 #include "tf2_ros/transform_listener.hpp"
 #include "msgs/msg/raceline.hpp"
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 
 class RacelinePurePursuitNode : public rclcpp::Node
 {
@@ -37,6 +39,7 @@ public:
     this->declare_parameter<double>("max_steering_angle", 0.42);
     this->declare_parameter<double>("min_speed", 1.5);
     this->declare_parameter<double>("max_speed", 4.0);
+    this->declare_parameter<bool>("do_adaptive_speed_control", false);
 
     map_frame_ = this->get_parameter("map_frame").as_string();
     base_frame_ = this->get_parameter("base_frame").as_string();
@@ -48,6 +51,7 @@ public:
     max_steering_angle_ = this->get_parameter("max_steering_angle").as_double();
     min_speed_ = this->get_parameter("min_speed").as_double();
     max_speed_ = this->get_parameter("max_speed").as_double();
+    do_adaptive_speed_control_ = this->get_parameter("do_adaptive_speed_control").as_bool();
 
     // Setup the parameter update callback for dynamic rqt/CLI tuning
     param_callback_handle_ = this->add_on_set_parameters_callback(
@@ -97,6 +101,9 @@ public:
         "/raceline_pp/nearest_point", 10);
     car_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>(
         "/raceline_pp/car_position", 10);
+    marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+      "/raceline/live_velocity_markers", 10);
+
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         this->get_parameter("odom_topic").as_string(),
@@ -123,20 +130,29 @@ public:
 private:
   void racelineCallback(const msgs::msg::Raceline::SharedPtr msg)
   {
-    raceline_.clear();
-    raceline_.reserve(msg->points.size());
+    if (!raceline_error_initialized) {      
+      raceline_.clear();
+      raceline_.reserve(msg->points.size());
 
-    for (const auto &p : msg->points)
-    {
-      pure_pursuit::RacelinePoint point;
-      point.s_m = p.s_m;
-      point.x_m = p.x_m;
-      point.y_m = p.y_m;
-      point.psi_rad = p.psi_rad;
-      point.kappa_radpm = p.kappa_radpm;
-      point.vx_mps = p.vx_mps;
-      point.ax_mps2 = p.ax_mps2;
-      raceline_.push_back(point);
+      for (const auto &p : msg->points)
+      {
+        pure_pursuit::RacelinePoint point;
+        point.s_m = p.s_m;
+        point.x_m = p.x_m;
+        point.y_m = p.y_m;
+        point.psi_rad = p.psi_rad;
+        point.kappa_radpm = p.kappa_radpm;
+        point.vx_mps = p.vx_mps;
+        point.ax_mps2 = p.ax_mps2;
+        raceline_.push_back(point);
+      }
+
+      std::cout << "init error vector" << std::endl;
+      std::vector<double> err_hist(raceline_.size(), 0.0); 
+      raceline_error_history = err_hist;
+      raceline_error_initialized = true;
+
+      this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
     }
 
     RCLCPP_INFO_ONCE(
@@ -144,7 +160,11 @@ private:
         "Received raceline with %zu points, closed length %.2f m",
         raceline_.size(),
         pure_pursuit::computeClosedTrackLength(raceline_));
+  }
 
+
+  void re_init_raceline_max_points()
+  {
     if (!raceline_.empty())
     {
       // initialize to the first point's velocity
@@ -164,11 +184,8 @@ private:
         }
       }
 
-
-      std::vector<double> err_hist(raceline_.size(), 0.0); 
-      raceline_error_history = err_hist;
-
-      RCLCPP_INFO_ONCE(
+        
+      RCLCPP_INFO(
           this->get_logger(),
           "Raceline speed limits (MPS, not real values! For real set 'min_speed' and 'max_speed'): Min = %.2f m/s, Max = %.2f m/s",
           min_mps_, max_mps_);
@@ -220,21 +237,43 @@ private:
 
 
     // automatic adaptive tune of speed
-    if (do_adaptive_speed_control_) {
 
-      // check error value
-      double err = raceline_error_history[nearest_index];
-      double factor = 1.0;
-      if (err < 0.05) {
-        
-      } else if (err > 10) {
-
-      } else {
-        factor = 1.0;
-      }
-
-      raceline_[nearest_index].vx_mps = raceline_[nearest_index].vx_mps * factor;
+    // handle last error -> log
+    
+    // calc error
+    double err = std::hypot(raceline_[nearest_index].x_m - car_x, raceline_[nearest_index].y_m - car_y);
+    
+    // set error
+    std::size_t size = this->raceline_error_history.size();
+    double factor = 1.0;
+    std::size_t i = 0;
+    if (err < 0.1) {
+      factor = 1.05;
+      i = last_nearest_index;
+    } else if (err > 0.2) {
+      factor = 0.92;
+      double distance = (1.0 / distance_between_two_raceline_points);
+      std::cout << "distance: " << distance <<  std::endl;
+      int temp = static_cast<int>( std::round(static_cast<double>(last_nearest_index) - distance ));
+      i = ( (temp % static_cast<int>(size)) + size ) % size;
+    } else {
+      factor = 1.0;
+      i = last_nearest_index;
     }
+
+    while (i != nearest_index) {
+      this->raceline_error_history[i] = err;
+
+      // adapt speed using the error profile
+      if (do_adaptive_speed_control_) {
+        // check error value
+        //std::cout << "error: " << err << std::endl;
+        
+        this->raceline_[i].vx_mps = this->raceline_[i].vx_mps * factor;
+      }
+      i = (i + 1) % size;  // wrap around at end
+    }
+
 
 
     // std::size_t goal_index = computeCurvatureDependentLookahead(raceline_, nearest_index, this->get_parameter("min_lookahead").as_double(), this->get_parameter("max_lookahead").as_double(), this->get_parameter("lookahead_gain").as_double());
@@ -269,22 +308,25 @@ private:
         wheelbase_,
         max_steering_angle_);
 
-    double target_speed = pure_pursuit::computeMpsDependentSpeed(
-        min_mps_,
-        max_mps_,
-        raceline_[nearest_index].vx_mps,
-        min_speed_,
-        max_speed_);
+    double target_speed = min_speed_;
+    if (!do_adaptive_speed_control_) {
+      target_speed = pure_pursuit::computeMpsDependentSpeed(
+          min_mps_,
+          max_mps_,
+          raceline_[nearest_index].vx_mps,
+          min_speed_,
+          max_speed_);
+    } else {
+      target_speed = raceline_[nearest_index].vx_mps;
+    }
 
-    publishMarkers(goal_map, nearest_index, car_x, car_y);
-    publishDrive(steering_angle, target_speed);
+    std::cout << "raceline_speed: " << raceline_[nearest_index].vx_mps << " publishing this speed: " << target_speed << std::endl;
+    this->publishMarkers(goal_map, nearest_index, car_x, car_y);
+    this->publishDrive(steering_angle, target_speed);
+    this->publishRacelineMarkers();
+    this->re_init_raceline_max_points();
+    this->last_nearest_index = nearest_index;
 
-    // ---- log Pos Error ----
-    
-    // calc error
-    double err = std::hypot(raceline_[nearest_index].x_m - car_x, raceline_[nearest_index].y_m - car_y);
-    raceline_error_history[nearest_index] = err;
-    
   }
 
   void publishMarkers(
@@ -324,6 +366,50 @@ private:
     // std::cout << "target speed: " << target_speed << std::endl;
   }
 
+  void publishRacelineMarkers()
+  {
+    visualization_msgs::msg::MarkerArray marker_array;
+    int marker_id = 0;
+    int skip_n = 30;
+    for (std::size_t idx = 0; idx < raceline_.size(); ++idx)
+    {
+        // skip points: only process every nth point
+        if (idx % skip_n != 0)
+            continue;
+
+        const auto &point = raceline_[idx];
+
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id = "map";
+        marker.header.stamp = this->now();
+        marker.ns = "raceline_velocity";
+        marker.id = marker_id++;
+        marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        marker.pose.position.x = point.x_m;
+        marker.pose.position.y = point.y_m;
+        marker.pose.position.z = 0.1;
+        marker.pose.orientation.w = 1.0;
+
+        marker.scale.z = 0.18;
+
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+        marker.color.a = 1.0;
+
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2) << "v:" <<point.vx_mps << " e:" << raceline_error_history[idx];
+        marker.text = ss.str();
+
+        marker_array.markers.push_back(marker);
+    }
+
+      // Publish the MarkerArray
+      marker_pub_->publish(marker_array);
+  }
+
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   rclcpp::TimerBase::SharedPtr timer_;
@@ -333,6 +419,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr car_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
 
   // Callback handle to keep the parameter event listener alive
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
@@ -355,6 +442,8 @@ private:
   double min_speed_;
   double max_speed_;
   bool do_adaptive_speed_control_ = false;
+  int last_nearest_index = 0;
+  double distance_between_two_raceline_points = 0;
 };
 
 int main(int argc, char **argv)

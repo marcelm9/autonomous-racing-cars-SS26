@@ -54,6 +54,7 @@ def generate_launch_description():
                         "min_target_speed": 0.5,
                         "max_target_speed": 3.7,
                         "curvature_speed_gain": 0.2,
+                        "do_adaptive_speed_control": False,
                     }
                 ],
             ),

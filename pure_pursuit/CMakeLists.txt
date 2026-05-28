@@ -25,6 +25,7 @@ find_package(tf2_msgs REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 add_executable(pure_pursuit
   src/pure_pursuit_node.cpp
@@ -37,7 +38,7 @@ target_include_directories(pure_pursuit PUBLIC
 )
 
 ament_target_dependencies(pure_pursuit
-  "rclcpp" "ament_index_cpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "tf2_geometry_msgs" "tf2_ros" "tf2" "msgs"
+  "rclcpp" "ament_index_cpp" "geometry_msgs" "ackermann_msgs" "nav_msgs" "tf2_geometry_msgs" "tf2_ros" "tf2" "msgs" "visualization_msgs"
 )
 
 install(TARGETS
