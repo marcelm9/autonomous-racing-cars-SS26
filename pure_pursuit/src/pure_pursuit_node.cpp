@@ -86,6 +86,7 @@ public:
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::duration<double>(1.0 / control_rate_hz)),
         std::bind(&RacelinePurePursuitNode::controlTimerCallback, this));
+
   }
 
 private:
@@ -199,6 +200,8 @@ private:
 
     publishMarkers(goal_map, nearest_index, car_x, car_y);
     publishDrive(steering_angle, target_speed);
+
+    // log Pos Error
     
   }
 
@@ -253,6 +256,9 @@ private:
   std::string map_frame_;
   std::string base_frame_;
   double current_speed_mps_ = 0.0;
+  bool raceline_error_initialized = false;
+  std::vector<double> raceline_error_history;
+  
 };
 
 int main(int argc, char **argv)
