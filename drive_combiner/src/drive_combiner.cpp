@@ -398,8 +398,9 @@ private:
         geometry_msgs::msg::TransformStamped laser_to_base_tf;
         try
         {
+            // Override the message's frame_id with the TF tree's actual name
             laser_to_base_tf = tf_buffer_->lookupTransform(
-                base_frame_, msg->header.frame_id, tf2::TimePointZero);
+                base_frame_, laser_frame_, tf2::TimePointZero);
         }
         catch (const tf2::TransformException &ex)
         {
