@@ -395,12 +395,12 @@ private:
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
         // 1. Get transform from the actual Laser frame to base_frame_
+        // 1. Get transform from the actual Laser frame to base_frame_
         geometry_msgs::msg::TransformStamped laser_to_base_tf;
         try
         {
-            // Override the message's frame_id with the TF tree's actual name
             laser_to_base_tf = tf_buffer_->lookupTransform(
-                base_frame_, laser_frame_, tf2::TimePointZero);
+                base_frame_, msg->header.frame_id, tf2::TimePointZero);
         }
         catch (const tf2::TransformException &ex)
         {
@@ -477,7 +477,8 @@ private:
             }
         }
 
-        TTCResult ttc_res = calc_min_ttc(msg);
+        // Pass the laser-to-base transform into the calculation
+        TTCResult ttc_res = calc_min_ttc(msg, laser_to_base_tf);
         double min_ttc = ttc_res.min_ttc;
         double min_dist = ttc_res.min_distance;
 
