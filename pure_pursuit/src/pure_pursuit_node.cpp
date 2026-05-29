@@ -39,9 +39,12 @@ public:
     this->declare_parameter<double>("max_steering_angle", 0.42);
     this->declare_parameter<double>("min_speed", 1.5);
     this->declare_parameter<double>("max_speed", 4.0);
-    this->declare_parameter<bool>("do_adaptive_speed_control", false);
+    this->declare_parameter<bool>("do_error_based_adaptive_speed_control", false);
     this->declare_parameter<double>("adaptive_control_slowing_factor", 1.0);
     this->declare_parameter<double>("adaptive_control_speed_up_factor", 1.0);
+    this->declare_parameter<bool>("do_linear_speed_scaling", true);
+    this->declare_parameter<double>("mps_speed_gain_for_nonlinear_speed_output", 1.0);
+
 
     map_frame_ = this->get_parameter("map_frame").as_string();
     base_frame_ = this->get_parameter("base_frame").as_string();
@@ -53,7 +56,11 @@ public:
     max_steering_angle_ = this->get_parameter("max_steering_angle").as_double();
     min_speed_ = this->get_parameter("min_speed").as_double();
     max_speed_ = this->get_parameter("max_speed").as_double();
-    do_adaptive_speed_control_ = this->get_parameter("do_adaptive_speed_control").as_bool();
+    do_adaptive_speed_control_ = this->get_parameter("do_error_based_adaptive_speed_control").as_bool();
+    slow_down_factor = this->get_parameter("adaptive_control_slowing_factor").as_double();
+    speed_up_factor = this->get_parameter("adaptive_control_speed_up_factor").as_double();
+    do_linear_speed_scaling = this->get_parameter("do_linear_speed_scaling").as_bool();
+    mps_speed_gain = this->get_parameter("mps_speed_gain_for_nonlinear_speed_output").as_double();
 
     // Setup the parameter update callback for dynamic rqt/CLI tuning
     param_callback_handle_ = this->add_on_set_parameters_callback(
@@ -87,7 +94,7 @@ public:
             {
               max_speed_ = param.as_double();
             }
-            else if (param.get_name() == "do_adaptive_speed_control" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+            else if (param.get_name() == "do_error_based_adaptive_speed_control" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
             {
               do_adaptive_speed_control_ = param.as_bool();
             }
@@ -98,6 +105,14 @@ public:
             else if (param.get_name() == "adaptive_control_speed_up_factor" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
             {
               speed_up_factor = param.as_double();
+            }
+            else if (param.get_name() == "do_linear_speed_scaling" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+            {
+              do_linear_speed_scaling = param.as_bool();
+            }
+            else if (param.get_name() == "mps_speed_gain_for_nonlinear_speed_output" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              mps_speed_gain = param.as_double();
             }
           }
           return result;
@@ -195,7 +210,7 @@ private:
       }
 
         
-      RCLCPP_INFO(
+      RCLCPP_INFO_ONCE(
           this->get_logger(),
           "Raceline speed limits (MPS, not real values! For real set 'min_speed' and 'max_speed'): Min = %.2f m/s, Max = %.2f m/s",
           min_mps_, max_mps_);
@@ -263,7 +278,6 @@ private:
     } else if (err > 0.2) {
       factor = this->slow_down_factor;
       double distance = (1.0 / distance_between_two_raceline_points);
-      std::cout << "distance: " << distance <<  std::endl;
       int temp = static_cast<int>( std::round(static_cast<double>(last_nearest_index) - distance ));
       i = ( (temp % static_cast<int>(size)) + size ) % size;
     } else {
@@ -319,7 +333,7 @@ private:
         max_steering_angle_);
 
     double target_speed = min_speed_;
-    if (!do_adaptive_speed_control_) {
+    if (do_linear_speed_scaling) {
       target_speed = pure_pursuit::computeMpsDependentSpeed(
           min_mps_,
           max_mps_,
@@ -327,10 +341,10 @@ private:
           min_speed_,
           max_speed_);
     } else {
-      target_speed = raceline_[nearest_index].vx_mps;
+      target_speed = raceline_[nearest_index].vx_mps * mps_speed_gain;
     }
 
-    std::cout << "raceline_speed: " << raceline_[nearest_index].vx_mps << " publishing this speed: " << target_speed << std::endl;
+    // std::cout << "raceline_speed: " << raceline_[nearest_index].vx_mps << " publishing this speed: " << target_speed << std::endl;
     this->publishMarkers(goal_map, nearest_index, car_x, car_y);
     this->publishDrive(steering_angle, target_speed);
     this->publishRacelineMarkers();
@@ -456,6 +470,8 @@ private:
   double distance_between_two_raceline_points = 0;
   double speed_up_factor = 1.0;
   double slow_down_factor = 1.0;
+  bool do_linear_speed_scaling = true;
+  double mps_speed_gain = 1.0;
 };
 
 int main(int argc, char **argv)
