@@ -78,7 +78,7 @@ def generate_launch_description():
                 parameters=[
                     {
                         "base_frame": "particle_filter_base_frame",
-                        "laser_frame": "laser",
+                        "laser_frame": "laser2",
                         "pp_input_topic": "/drive_pp",
                         "re_input_topic": "/drive_re",
                         "drive_output_topic": "/drive",
