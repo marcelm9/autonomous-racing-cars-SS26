@@ -40,6 +40,8 @@ public:
     this->declare_parameter<double>("min_speed", 1.5);
     this->declare_parameter<double>("max_speed", 4.0);
     this->declare_parameter<bool>("do_adaptive_speed_control", false);
+    this->declare_parameter<double>("adaptive_control_slowing_factor", 1.0);
+    this->declare_parameter<double>("adaptive_control_speed_up_factor", 1.0);
 
     map_frame_ = this->get_parameter("map_frame").as_string();
     base_frame_ = this->get_parameter("base_frame").as_string();
@@ -88,6 +90,14 @@ public:
             else if (param.get_name() == "do_adaptive_speed_control" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
             {
               do_adaptive_speed_control_ = param.as_bool();
+            }
+            else if (param.get_name() == "adaptive_control_slowing_factor" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              slow_down_factor = param.as_double();
+            }
+            else if (param.get_name() == "adaptive_control_speed_up_factor" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              speed_up_factor = param.as_double();
             }
           }
           return result;
@@ -248,10 +258,10 @@ private:
     double factor = 1.0;
     std::size_t i = 0;
     if (err < 0.1) {
-      factor = 1.05;
+      factor = speed_up_factor;
       i = last_nearest_index;
     } else if (err > 0.2) {
-      factor = 0.92;
+      factor = this->slow_down_factor;
       double distance = (1.0 / distance_between_two_raceline_points);
       std::cout << "distance: " << distance <<  std::endl;
       int temp = static_cast<int>( std::round(static_cast<double>(last_nearest_index) - distance ));
@@ -444,6 +454,8 @@ private:
   bool do_adaptive_speed_control_ = false;
   int last_nearest_index = 0;
   double distance_between_two_raceline_points = 0;
+  double speed_up_factor = 1.0;
+  double slow_down_factor = 1.0;
 };
 
 int main(int argc, char **argv)
