@@ -81,10 +81,16 @@ def generate_launch_description():
                         "drive_output_topic": "ego_racecar/drive",
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
+                        "base_frame": "ego_racecar/base_link",
+                        "laser_frame": "ego_racecar/laser",
                         "ttc_threshold": 0.5,
                         "ttc_cone_width_deg": 10.0,
-                        "raceline_distance_threshold": 0.25
+                        "raceline_distance_threshold": 0.25,
+                        "visual_path_length": 2.0,
                     }
+                ],
+            ),
+
                 ],
             ),
             Node(

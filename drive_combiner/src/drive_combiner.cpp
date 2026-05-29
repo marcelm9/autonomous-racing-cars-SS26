@@ -9,6 +9,9 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "std_msgs/msg/header.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "tf2_ros/transform_listener.hpp"
+#include "tf2_ros/buffer.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using std::placeholders::_1;
 
@@ -21,14 +24,25 @@ struct TTCResult
 class DriveCombiner : public rclcpp::Node
 {
 public:
-    DriveCombiner() : Node("drive_combiner"), current_speed_(0.0), reactive_mode_active_(false), has_goal_(false)
+    DriveCombiner() : Node("drive_combiner"), 
+        current_speed_(0.0), 
+        reactive_mode_active_(false), 
+        has_goal_(false),
+        tf_buffer_(std::make_unique<tf2_ros::Buffer>(this->get_clock())),
+        tf_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_buffer_))
     {
         // Declare parameters
-        this->declare_parameter<double>("ttc_threshold", 1.0);
+        this->declare_parameter<double>("ttc_threshold", 10.0);
         this->declare_parameter<double>("ttc_cone_width_deg", 10.0);
         this->declare_parameter<std::string>("base_frame", "ego_racecar/base_link");
+        this->declare_parameter<std::string>("laser_frame", "ego_racecar/laser");
         this->declare_parameter<double>("switch_cooldown_seconds", 1.0);
         this->declare_parameter<double>("raceline_distance_threshold", 0.5);
+        this->declare_parameter<double>("vehicle_width", 0.2);
+        this->declare_parameter<double>("safety_margin", 0.1);
+        this->declare_parameter<double>("ttc_lookahead_distance", 5.0);
+        this->declare_parameter<double>("visual_path_length", 2.0);
+        this->declare_parameter<double>("collision_distance_threshold", 0.1);
         this->declare_parameter<std::string>("odom_topic");
         this->declare_parameter<std::string>("scan_topic");
         this->declare_parameter<std::string>("pp_input_topic");
@@ -36,6 +50,17 @@ public:
         this->declare_parameter<std::string>("drive_output_topic");
         this->declare_parameter<std::string>("goal_point_topic", "/raceline_pp/goal_point");
         this->declare_parameter<std::string>("path_topic", "/raceline/path");
+
+        base_frame_ = this->get_parameter("base_frame").as_string();
+        laser_frame_ = this->get_parameter("laser_frame").as_string();
+        ttc_threshold_ = this->get_parameter("ttc_threshold").as_double();
+        collision_dist_thresh_ = this->get_parameter("collision_distance_threshold").as_double();
+        switch_cooldown_seconds_ = this->get_parameter("switch_cooldown_seconds").as_double();
+        raceline_dist_thresh_ = this->get_parameter("raceline_distance_threshold").as_double();
+        vehicle_width_ = this->get_parameter("vehicle_width").as_double();
+        safety_margin_ = this->get_parameter("safety_margin").as_double();
+        ttc_lookahead_distance_ = this->get_parameter("ttc_lookahead_distance").as_double();
+        visual_path_length_ = this->get_parameter("visual_path_length").as_double();
 
         last_switch_time_ = this->now();
 
@@ -68,16 +93,29 @@ public:
 
 private:
     double current_speed_;
-    geometry_msgs::msg::Point current_position_;
-    double current_yaw_ = 0.0;
 
     nav_msgs::msg::Path::SharedPtr latest_path_;
-    geometry_msgs::msg::Point latest_goal_point_;
+    std::vector<geometry_msgs::msg::Point> transformed_path_points_;
+    geometry_msgs::msg::PointStamped latest_goal_point_stamped_;
     bool has_goal_;
 
     bool reactive_mode_active_;
     double last_pp_steering_ = 0.0;
     rclcpp::Time last_switch_time_;
+
+    std::string base_frame_;
+    std::string laser_frame_;
+    double ttc_threshold_;
+    double collision_dist_thresh_;
+    double switch_cooldown_seconds_;
+    double raceline_dist_thresh_;
+    double vehicle_width_;
+    double safety_margin_;
+    double ttc_lookahead_distance_;
+    double visual_path_length_;
+
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -96,21 +134,23 @@ private:
 
     void goal_point_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg)
     {
-        // Store the global goal point, calculate relative angle later in scan_callback
-        latest_goal_point_ = msg->point;
+        latest_goal_point_stamped_ = *msg;
         has_goal_ = true;
     }
 
     void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        current_speed_ = msg->twist.twist.linear.x;
-        current_position_ = msg->pose.pose.position;
+        current_speed_ = std::hypot(msg->twist.twist.linear.x, msg->twist.twist.linear.y);
+    }
 
-        // Extract Yaw from the Odometry Quaternion
-        auto q = msg->pose.pose.orientation;
-        double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
-        double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
-        current_yaw_ = std::atan2(siny_cosp, cosy_cosp);
+    double distance_to_segment(double lx, double ly, const geometry_msgs::msg::Point &p1, const geometry_msgs::msg::Point &p2)
+    {
+        double dx = p2.x - p1.x;
+        double dy = p2.y - p1.y;
+        double l2 = dx * dx + dy * dy;
+        if (l2 < 1e-6) return std::hypot(lx - p1.x, ly - p1.y);
+        double t = std::max(0.0, std::min(1.0, ((lx - p1.x) * dx + (ly - p1.y) * dy) / l2));
+        return std::hypot(lx - (p1.x + t * dx), ly - (p1.y + t * dy));
     }
 
     double get_distance_to_raceline()
@@ -120,12 +160,27 @@ private:
             return std::numeric_limits<double>::infinity();
         }
 
+        double car_x = 0.0;
+        double car_y = 0.0;
+
+        try
+        {
+            geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
+                latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
+            car_x = tf.transform.translation.x;
+            car_y = tf.transform.translation.y;
+        }
+        catch (const tf2::TransformException &ex)
+        {
+            return std::numeric_limits<double>::infinity();
+        }
+
         double min_dist = std::numeric_limits<double>::infinity();
 
         for (const auto &pose_stamped : latest_path_->poses)
         {
-            double dx = current_position_.x - pose_stamped.pose.position.x;
-            double dy = current_position_.y - pose_stamped.pose.position.y;
+            double dx = car_x - pose_stamped.pose.position.x;
+            double dy = car_y - pose_stamped.pose.position.y;
             double dist = std::hypot(dx, dy);
 
             if (dist < min_dist)
@@ -136,31 +191,50 @@ private:
         return min_dist;
     }
 
-    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg, double cone_center)
+    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         double angle_increment = msg->angle_increment;
         double angle_min = msg->angle_min;
-        std::vector<float> ranges = msg->ranges;
+        const std::vector<float> &ranges = msg->ranges;
 
-        double cone_width_deg = this->get_parameter("ttc_cone_width_deg").as_double();
-        double fov_limit = (cone_width_deg / 2.0) * (M_PI / 180.0);
+        double safety_width = vehicle_width_ / 2.0 + safety_margin_;
 
         int num_lasers = ranges.size();
         float min_TTC = std::numeric_limits<float>::infinity();
         float min_distance = std::numeric_limits<float>::infinity();
 
+        if (transformed_path_points_.size() < 2) return {min_TTC, min_distance};
+
         for (int i = 0; i < num_lasers; i++)
         {
-            double angle = i * angle_increment + angle_min;
-
-            if (angle < (cone_center - fov_limit) || angle > (cone_center + fov_limit))
-                continue;
-
             if (std::isnan(ranges[i]) || std::isinf(ranges[i]))
                 continue;
 
-            double projection = std::max(0.0, current_speed_ * std::cos(angle - cone_center));
-            float ttc = (projection <= 0.0) ? std::numeric_limits<float>::infinity() : (ranges[i] / projection);
+            double angle = i * angle_increment + angle_min;
+            double lx = ranges[i] * std::cos(angle);
+            double ly = ranges[i] * std::sin(angle);
+
+            // Find if this laser point is near any segment of the raceline
+            bool point_on_path = false;
+            for (size_t j = 0; j < transformed_path_points_.size() - 1; ++j)
+            {
+                // Only consider path segments that have at least one point in front of the car
+                if (transformed_path_points_[j].x < -0.1 && transformed_path_points_[j+1].x < -0.1) continue;
+
+                if (distance_to_segment(lx, ly, transformed_path_points_[j], transformed_path_points_[j+1]) < safety_width)
+                {
+                    point_on_path = true;
+                    break;
+                }
+            }
+
+            if (!point_on_path)
+                continue;
+
+            // Use a small speed floor for TTC calculation to avoid INF when nearly stopped
+            double effective_speed = std::max(0.1, current_speed_);
+            double projection = std::max(0.0, effective_speed * std::cos(angle));
+            float ttc = (projection <= 1e-6) ? std::numeric_limits<float>::infinity() : (ranges[i] / projection);
 
             if (ttc < min_TTC)
                 min_TTC = ttc;
@@ -174,7 +248,7 @@ private:
     void publish_mode_marker(const builtin_interfaces::msg::Time &stamp)
     {
         visualization_msgs::msg::Marker marker;
-        marker.header.frame_id = this->get_parameter("base_frame").as_string();
+        marker.header.frame_id = base_frame_;
         marker.header.stamp = stamp;
         marker.ns = "drive_mode";
         marker.id = 0;
@@ -189,9 +263,9 @@ private:
 
         if (reactive_mode_active_)
         {
-            marker.color.r = 1.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
+            marker.color.r = 0.0;
+            marker.color.g = 0.0;
+            marker.color.b = 1.0;
         }
         else
         {
@@ -202,46 +276,81 @@ private:
         marker_pub_->publish(marker);
     }
 
-    void publish_cone_marker(const std_msgs::msg::Header &header, double cone_center)
+    void publish_cone_marker(const std_msgs::msg::Header &header)
     {
-        double cone_width_deg = this->get_parameter("ttc_cone_width_deg").as_double();
-        double fov_limit = (cone_width_deg / 2.0) * (M_PI / 180.0);
+        double safety_width = vehicle_width_ / 2.0 + safety_margin_;
+        double visual_length = visual_path_length_;
 
         visualization_msgs::msg::Marker cone;
         cone.header = header;
-        cone.header.frame_id = this->get_parameter("base_frame").as_string();
+        // MUST use the same frame as transformed_path_points_
+        cone.header.frame_id = header.frame_id; 
         cone.ns = "ttc_cone";
         cone.id = 1;
         cone.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
         cone.action = visualization_msgs::msg::Marker::ADD;
+        cone.pose.orientation.w = 1.0;
         cone.scale.x = 1.0;
         cone.scale.y = 1.0;
         cone.scale.z = 1.0;
 
-        double visual_length = 3.0;
-        double z_offset = 0.05;
-        geometry_msgs::msg::Point origin, left_pt, right_pt;
-        origin.z = z_offset;
+        if (transformed_path_points_.size() < 2)
+            return;
 
-        left_pt.x = visual_length * std::cos(cone_center + fov_limit);
-        left_pt.y = visual_length * std::sin(cone_center + fov_limit);
-        left_pt.z = z_offset;
+        double accumulated_dist = 0.0;
+        for (size_t i = 0; i < transformed_path_points_.size() - 1; ++i)
+        {
+            const auto &p1 = transformed_path_points_[i];
+            const auto &p2 = transformed_path_points_[i + 1];
 
-        right_pt.x = visual_length * std::cos(cone_center - fov_limit);
-        right_pt.y = visual_length * std::sin(cone_center - fov_limit);
-        right_pt.z = z_offset;
+            double dx = p2.x - p1.x;
+            double dy = p2.y - p1.y;
+            double len = std::hypot(dx, dy);
 
-        cone.points.push_back(origin);
-        cone.points.push_back(left_pt);
-        cone.points.push_back(right_pt);
+            accumulated_dist += len;
+            if (accumulated_dist > visual_length)
+                break;
+
+            if (len < 1e-6)
+                continue;
+
+            double nx = -dy / len;
+            double ny = dx / len;
+
+            geometry_msgs::msg::Point p1_left, p1_right, p2_left, p2_right;
+            p1_left.x = p1.x + nx * safety_width;
+            p1_left.y = p1.y + ny * safety_width;
+            p1_left.z = 0.05;
+
+            p1_right.x = p1.x - nx * safety_width;
+            p1_right.y = p1.y - ny * safety_width;
+            p1_right.z = 0.05;
+
+            p2_left.x = p2.x + nx * safety_width;
+            p2_left.y = p2.y + ny * safety_width;
+            p2_left.z = 0.05;
+
+            p2_right.x = p2.x - nx * safety_width;
+            p2_right.y = p2.y - ny * safety_width;
+            p2_right.z = 0.05;
+
+            // Two triangles for each segment
+            cone.points.push_back(p1_left);
+            cone.points.push_back(p1_right);
+            cone.points.push_back(p2_left);
+
+            cone.points.push_back(p1_right);
+            cone.points.push_back(p2_right);
+            cone.points.push_back(p2_left);
+        }
 
         std_msgs::msg::ColorRGBA c;
         c.a = 0.5;
         if (reactive_mode_active_)
         {
-            c.r = 1.0;
-            c.g = 1.0;
-            c.b = 0.0;
+            c.r = 0.0;
+            c.g = 0.0;
+            c.b = 1.0;
         }
         else
         {
@@ -251,46 +360,101 @@ private:
         }
 
         cone.color = c;
-        cone.colors.push_back(c);
-        cone.colors.push_back(c);
-        cone.colors.push_back(c);
+        for (size_t i = 0; i < cone.points.size(); ++i)
+        {
+            cone.colors.push_back(c);
+        }
 
         cone_pub_->publish(cone);
     }
 
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
-        double switch_cooldown_seconds = this->get_parameter("switch_cooldown_seconds").as_double();
-        double raceline_dist_thresh = this->get_parameter("raceline_distance_threshold").as_double();
+        double ttc_threshold = ttc_threshold_;
+        double collision_dist_thresh = collision_dist_thresh_;
+        double switch_cooldown_seconds = switch_cooldown_seconds_;
+        double raceline_dist_thresh = raceline_dist_thresh_;
 
         rclcpp::Time current_time = this->now();
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
-        double cone_center = 0.0;
-
-        // <-- CALCULATE LOCAL ANGLE HERE -->
-        if (has_goal_)
+        // <-- TRANSFORM AND FILTER RACELINE HERE -->
+        transformed_path_points_.clear();
+        if (latest_path_ && !latest_path_->poses.empty())
         {
-            // Vector from car to goal
-            double dx = latest_goal_point_.x - current_position_.x;
-            double dy = latest_goal_point_.y - current_position_.y;
+            try
+            {
+                std::string target_frame = msg->header.frame_id; // Transform to laser frame for TTC
+                if (target_frame.empty()) {
+                    target_frame = laser_frame_;
+                }
+                
+                double ttc_lookahead = ttc_lookahead_distance_;
+                
+                geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
+                    target_frame, latest_path_->header.frame_id, tf2::TimePointZero);
 
-            // Absolute angle to goal on the map
-            double global_angle = std::atan2(dy, dx);
+                // 1. Find the nearest point index
+                size_t nearest_idx = 0;
+                double min_dist_sq = std::numeric_limits<double>::max();
+                
+                geometry_msgs::msg::TransformStamped tf_inv = tf_buffer_->lookupTransform(
+                    latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
+                double car_x = tf_inv.transform.translation.x;
+                double car_y = tf_inv.transform.translation.y;
 
-            // Local angle relative to the nose of the car
-            cone_center = global_angle - current_yaw_;
+                for (size_t i = 0; i < latest_path_->poses.size(); ++i)
+                {
+                    double dx = car_x - latest_path_->poses[i].pose.position.x;
+                    double dy = car_y - latest_path_->poses[i].pose.position.y;
+                    double dist_sq = dx * dx + dy * dy;
+                    if (dist_sq < min_dist_sq)
+                    {
+                        min_dist_sq = dist_sq;
+                        nearest_idx = i;
+                    }
+                }
 
-            // Normalize to [-PI, PI] to prevent visual spinning/overflows
-            while (cone_center > M_PI)
-                cone_center -= 2.0 * M_PI;
-            while (cone_center < -M_PI)
-                cone_center += 2.0 * M_PI;
+                // 2. Start from nearest_idx and take points ahead
+                double accumulated_dist = 0.0;
+                size_t current_idx = nearest_idx;
+                size_t n_points = latest_path_->poses.size();
+
+                for (size_t i = 0; i < n_points; ++i)
+                {
+                    size_t idx = (current_idx + i) % n_points;
+                    
+                    geometry_msgs::msg::PointStamped ps_in, ps_out;
+                    ps_in.header = latest_path_->header;
+                    ps_in.point = latest_path_->poses[idx].pose.position;
+                    tf2::doTransform(ps_in, ps_out, tf);
+
+                    transformed_path_points_.push_back(ps_out.point);
+
+                    if (i > 0)
+                    {
+                        size_t prev_idx = (current_idx + i - 1) % n_points;
+                        double dx = latest_path_->poses[idx].pose.position.x - latest_path_->poses[prev_idx].pose.position.x;
+                        double dy = latest_path_->poses[idx].pose.position.y - latest_path_->poses[prev_idx].pose.position.y;
+                        accumulated_dist += std::hypot(dx, dy);
+                    }
+
+                    if (accumulated_dist > ttc_lookahead)
+                        break;
+                }
+            }
+            catch (const tf2::TransformException &ex)
+            {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                                     "Path transform failed: %s", ex.what());
+            }
         }
 
-        double min_ttc = calc_min_ttc(msg, cone_center).min_ttc;
-        bool want_reactive_mode = (min_ttc <= ttc_threshold);
+        TTCResult ttc_res = calc_min_ttc(msg);
+        double min_ttc = ttc_res.min_ttc;
+        double min_dist = ttc_res.min_distance;
+
+        bool want_reactive_mode = (min_ttc <= ttc_threshold) || (min_dist <= collision_dist_thresh);
 
         if (want_reactive_mode)
         {
@@ -299,7 +463,7 @@ private:
             if (!reactive_mode_active_)
             {
                 reactive_mode_active_ = true;
-                RCLCPP_WARN(this->get_logger(), "SWITCH -> REACTIVE (TTC: %.2f <= %.2f)", min_ttc, ttc_threshold);
+                RCLCPP_INFO(this->get_logger(), "SWITCH -> BLUE/REACTIVE (TTC: %.2f, MinDist: %.2f)", min_ttc, min_dist);
             }
         }
         else
@@ -311,20 +475,18 @@ private:
                 if (current_dist_to_path <= raceline_dist_thresh)
                 {
                     reactive_mode_active_ = false;
-                    RCLCPP_WARN(this->get_logger(), "SWITCH -> PURE_PURSUIT (TTC: %.2f > %.2f) | Path Dist: %.2f <= %.2f",
-                                min_ttc, ttc_threshold, current_dist_to_path, raceline_dist_thresh);
-                }
-                else
-                {
-                    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                                         "Reactive Mode Active: Waiting to get closer to raceline (Current Dist: %.2f > %.2f)",
-                                         current_dist_to_path, raceline_dist_thresh);
+                    RCLCPP_INFO(this->get_logger(), "SWITCH -> GREEN/PURE_PURSUIT (TTC: %.2f, MinDist: %.2f) | Path Dist: %.2f",
+                                min_ttc, min_dist, current_dist_to_path);
                 }
             }
         }
+        
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 500, 
+                             "TTC: %.2f, MinDist: %.2f, Mode: %s", 
+                             min_ttc, min_dist, reactive_mode_active_ ? "REACTIVE" : "PURE_PURSUIT");
 
         publish_mode_marker(msg->header.stamp);
-        publish_cone_marker(msg->header, cone_center);
+        publish_cone_marker(msg->header);
     }
 
     void drive_pp_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
