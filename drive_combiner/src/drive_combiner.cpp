@@ -24,12 +24,12 @@ struct TTCResult
 class DriveCombiner : public rclcpp::Node
 {
 public:
-    DriveCombiner() : Node("drive_combiner"), 
-        current_speed_(0.0), 
-        reactive_mode_active_(false), 
-        has_goal_(false),
-        tf_buffer_(std::make_unique<tf2_ros::Buffer>(this->get_clock())),
-        tf_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_buffer_))
+    DriveCombiner() : Node("drive_combiner"),
+                      current_speed_(0.0),
+                      reactive_mode_active_(false),
+                      has_goal_(false),
+                      tf_buffer_(std::make_unique<tf2_ros::Buffer>(this->get_clock())),
+                      tf_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_buffer_))
     {
         // Declare parameters
         this->declare_parameter<double>("ttc_threshold", 10.0);
@@ -148,7 +148,8 @@ private:
         double dx = p2.x - p1.x;
         double dy = p2.y - p1.y;
         double l2 = dx * dx + dy * dy;
-        if (l2 < 1e-6) return std::hypot(lx - p1.x, ly - p1.y);
+        if (l2 < 1e-6)
+            return std::hypot(lx - p1.x, ly - p1.y);
         double t = std::max(0.0, std::min(1.0, ((lx - p1.x) * dx + (ly - p1.y) * dy) / l2));
         return std::hypot(lx - (p1.x + t * dx), ly - (p1.y + t * dy));
     }
@@ -191,7 +192,7 @@ private:
         return min_dist;
     }
 
-    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg)
+    TTCResult calc_min_ttc(const sensor_msgs::msg::LaserScan::SharedPtr msg, const geometry_msgs::msg::TransformStamped &laser_to_base_tf)
     {
         double angle_increment = msg->angle_increment;
         double angle_min = msg->angle_min;
@@ -203,7 +204,12 @@ private:
         float min_TTC = std::numeric_limits<float>::infinity();
         float min_distance = std::numeric_limits<float>::infinity();
 
-        if (transformed_path_points_.size() < 2) return {min_TTC, min_distance};
+        if (transformed_path_points_.size() < 2)
+            return {min_TTC, min_distance};
+
+        geometry_msgs::msg::Point pt_laser;
+        geometry_msgs::msg::Point pt_base;
+        pt_laser.z = 0.0;
 
         for (int i = 0; i < num_lasers; i++)
         {
@@ -211,17 +217,23 @@ private:
                 continue;
 
             double angle = i * angle_increment + angle_min;
-            double lx = ranges[i] * std::cos(angle);
-            double ly = ranges[i] * std::sin(angle);
+
+            // 1. Get Cartesian coordinates in the raw Lidar frame
+            pt_laser.x = ranges[i] * std::cos(angle);
+            pt_laser.y = ranges[i] * std::sin(angle);
+
+            // 2. Transform the point into base_frame_
+            tf2::doTransform(pt_laser, pt_base, laser_to_base_tf);
 
             // Find if this laser point is near any segment of the raceline
             bool point_on_path = false;
             for (size_t j = 0; j < transformed_path_points_.size() - 1; ++j)
             {
-                // Only consider path segments that have at least one point in front of the car
-                if (transformed_path_points_[j].x < -0.1 && transformed_path_points_[j+1].x < -0.1) continue;
+                // Because we are now in base_frame_, X is guaranteed to be forward
+                if (transformed_path_points_[j].x < -0.1 && transformed_path_points_[j + 1].x < -0.1)
+                    continue;
 
-                if (distance_to_segment(lx, ly, transformed_path_points_[j], transformed_path_points_[j+1]) < safety_width)
+                if (distance_to_segment(pt_base.x, pt_base.y, transformed_path_points_[j], transformed_path_points_[j + 1]) < safety_width)
                 {
                     point_on_path = true;
                     break;
@@ -231,15 +243,19 @@ private:
             if (!point_on_path)
                 continue;
 
-            // Use a small speed floor for TTC calculation to avoid INF when nearly stopped
+            // 3. Calculate TTC using the angle relative to base_link, not the Lidar
+            double base_angle = std::atan2(pt_base.y, pt_base.x);
+            double dist_base = std::hypot(pt_base.x, pt_base.y);
+
             double effective_speed = std::max(0.1, current_speed_);
-            double projection = std::max(0.0, effective_speed * std::cos(angle));
-            float ttc = (projection <= 1e-6) ? std::numeric_limits<float>::infinity() : (ranges[i] / projection);
+            double projection = std::max(0.0, effective_speed * std::cos(base_angle));
+
+            float ttc = (projection <= 1e-6) ? std::numeric_limits<float>::infinity() : (dist_base / projection);
 
             if (ttc < min_TTC)
                 min_TTC = ttc;
-            if (ranges[i] < min_distance)
-                min_distance = ranges[i];
+            if (dist_base < min_distance)
+                min_distance = dist_base;
         }
 
         return {min_TTC, min_distance};
@@ -284,7 +300,7 @@ private:
         visualization_msgs::msg::Marker cone;
         cone.header = header;
         // MUST use the same frame as transformed_path_points_
-        cone.header.frame_id = base_frame_; 
+        cone.header.frame_id = base_frame_;
         cone.ns = "ttc_cone";
         cone.id = 1;
         cone.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
@@ -378,26 +394,36 @@ private:
         rclcpp::Time current_time = this->now();
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
 
+        // 1. Get transform from the actual Laser frame to base_frame_
+        geometry_msgs::msg::TransformStamped laser_to_base_tf;
+        try
+        {
+            laser_to_base_tf = tf_buffer_->lookupTransform(
+                base_frame_, msg->header.frame_id, tf2::TimePointZero);
+        }
+        catch (const tf2::TransformException &ex)
+        {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Laser->Base transform missing: %s", ex.what());
+            return;
+        }
+
         // <-- TRANSFORM AND FILTER RACELINE HERE -->
         transformed_path_points_.clear();
         if (latest_path_ && !latest_path_->poses.empty())
         {
             try
             {
-                std::string target_frame = msg->header.frame_id; // Transform to laser frame for TTC
-                if (true) { //target_frame.empty()
-                    target_frame = laser_frame_;
-                }
-                
+                // We now force the target frame to be base_frame_
+                std::string target_frame = base_frame_;
                 double ttc_lookahead = ttc_lookahead_distance_;
-                
+
                 geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
                     target_frame, latest_path_->header.frame_id, tf2::TimePointZero);
 
-                // 1. Find the nearest point index
+                // Find the nearest point index
                 size_t nearest_idx = 0;
                 double min_dist_sq = std::numeric_limits<double>::max();
-                
+
                 geometry_msgs::msg::TransformStamped tf_inv = tf_buffer_->lookupTransform(
                     latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
                 double car_x = tf_inv.transform.translation.x;
@@ -415,7 +441,7 @@ private:
                     }
                 }
 
-                // 2. Start from nearest_idx and take points ahead
+                // Start from nearest_idx and take points ahead
                 double accumulated_dist = 0.0;
                 size_t current_idx = nearest_idx;
                 size_t n_points = latest_path_->poses.size();
@@ -423,7 +449,7 @@ private:
                 for (size_t i = 0; i < n_points; ++i)
                 {
                     size_t idx = (current_idx + i) % n_points;
-                    
+
                     geometry_msgs::msg::PointStamped ps_in, ps_out;
                     ps_in.header = latest_path_->header;
                     ps_in.point = latest_path_->poses[idx].pose.position;
@@ -480,10 +506,10 @@ private:
                 }
             }
         }
-        
-        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 500, 
-                             "TTC: %.2f, MinDist: %.2f, Mode: %s", 
-                             min_ttc, min_dist, reactive_mode_active_ ? "REACTIVE" : "PURE_PURSUIT");
+
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+                              "TTC: %.2f, MinDist: %.2f, Mode: %s",
+                              min_ttc, min_dist, reactive_mode_active_ ? "REACTIVE" : "PURE_PURSUIT");
 
         publish_mode_marker(msg->header.stamp);
         publish_cone_marker(msg->header);
