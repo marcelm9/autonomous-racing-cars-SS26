@@ -74,7 +74,9 @@ def generate_launch_description():
                 executable="drive_combiner",
                 name="drive_combiner",
                 output="screen",
+                arguments=['--ros-args', '--log-level', 'debug'],
                 parameters=[
+                    
                     {
                         "pp_input_topic": "ego_racecar/drive_pp",
                         "re_input_topic": "ego_racecar/drive_re",
