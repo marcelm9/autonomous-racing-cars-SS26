@@ -9,8 +9,8 @@
 #include "visualization_msgs/msg/marker.hpp"
 #include "std_msgs/msg/header.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
-#include "tf2_ros/transform_listener.h"
-#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.hpp"
+#include "tf2_ros/buffer.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using std::placeholders::_1;
@@ -24,12 +24,18 @@ struct TTCResult
 class DriveCombiner : public rclcpp::Node
 {
 public:
-    DriveCombiner() : Node("drive_combiner"), current_speed_(0.0), reactive_mode_active_(false), has_goal_(false)
+    DriveCombiner() : Node("drive_combiner"), 
+        current_speed_(0.0), 
+        reactive_mode_active_(false), 
+        has_goal_(false),
+        tf_buffer_(std::make_unique<tf2_ros::Buffer>(this->get_clock())),
+        tf_listener_(std::make_shared<tf2_ros::TransformListener>(*tf_buffer_))
     {
         // Declare parameters
         this->declare_parameter<double>("ttc_threshold", 10.0);
         this->declare_parameter<double>("ttc_cone_width_deg", 10.0);
         this->declare_parameter<std::string>("base_frame", "ego_racecar/base_link");
+        this->declare_parameter<std::string>("laser_frame", "ego_racecar/laser");
         this->declare_parameter<double>("switch_cooldown_seconds", 1.0);
         this->declare_parameter<double>("raceline_distance_threshold", 0.5);
         this->declare_parameter<double>("vehicle_width", 0.2);
@@ -44,6 +50,17 @@ public:
         this->declare_parameter<std::string>("drive_output_topic");
         this->declare_parameter<std::string>("goal_point_topic", "/raceline_pp/goal_point");
         this->declare_parameter<std::string>("path_topic", "/raceline/path");
+
+        base_frame_ = this->get_parameter("base_frame").as_string();
+        laser_frame_ = this->get_parameter("laser_frame").as_string();
+        ttc_threshold_ = this->get_parameter("ttc_threshold").as_double();
+        collision_dist_thresh_ = this->get_parameter("collision_distance_threshold").as_double();
+        switch_cooldown_seconds_ = this->get_parameter("switch_cooldown_seconds").as_double();
+        raceline_dist_thresh_ = this->get_parameter("raceline_distance_threshold").as_double();
+        vehicle_width_ = this->get_parameter("vehicle_width").as_double();
+        safety_margin_ = this->get_parameter("safety_margin").as_double();
+        ttc_lookahead_distance_ = this->get_parameter("ttc_lookahead_distance").as_double();
+        visual_path_length_ = this->get_parameter("visual_path_length").as_double();
 
         last_switch_time_ = this->now();
 
@@ -66,10 +83,6 @@ public:
         path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
             this->get_parameter("path_topic").as_string().c_str(), 1, std::bind(&DriveCombiner::path_callback, this, _1));
 
-        // Initialize TF
-        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-
         // publishers
         drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_output_topic").as_string().c_str(), 10);
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/mode_marker", 10);
@@ -89,6 +102,17 @@ private:
     bool reactive_mode_active_;
     double last_pp_steering_ = 0.0;
     rclcpp::Time last_switch_time_;
+
+    std::string base_frame_;
+    std::string laser_frame_;
+    double ttc_threshold_;
+    double collision_dist_thresh_;
+    double switch_cooldown_seconds_;
+    double raceline_dist_thresh_;
+    double vehicle_width_;
+    double safety_margin_;
+    double ttc_lookahead_distance_;
+    double visual_path_length_;
 
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -141,9 +165,8 @@ private:
 
         try
         {
-            std::string base_frame = this->get_parameter("base_frame").as_string();
             geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
-                latest_path_->header.frame_id, base_frame, rclcpp::Time(0));
+                latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
             car_x = tf.transform.translation.x;
             car_y = tf.transform.translation.y;
         }
@@ -174,7 +197,7 @@ private:
         double angle_min = msg->angle_min;
         const std::vector<float> &ranges = msg->ranges;
 
-        double safety_width = this->get_parameter("vehicle_width").as_double() / 2.0 + this->get_parameter("safety_margin").as_double();
+        double safety_width = vehicle_width_ / 2.0 + safety_margin_;
 
         int num_lasers = ranges.size();
         float min_TTC = std::numeric_limits<float>::infinity();
@@ -225,7 +248,7 @@ private:
     void publish_mode_marker(const builtin_interfaces::msg::Time &stamp)
     {
         visualization_msgs::msg::Marker marker;
-        marker.header.frame_id = this->get_parameter("base_frame").as_string();
+        marker.header.frame_id = base_frame_;
         marker.header.stamp = stamp;
         marker.ns = "drive_mode";
         marker.id = 0;
@@ -255,8 +278,8 @@ private:
 
     void publish_cone_marker(const std_msgs::msg::Header &header)
     {
-        double safety_width = this->get_parameter("vehicle_width").as_double() / 2.0 + this->get_parameter("safety_margin").as_double();
-        double visual_length = this->get_parameter("visual_path_length").as_double();
+        double safety_width = vehicle_width_ / 2.0 + safety_margin_;
+        double visual_length = visual_path_length_;
 
         visualization_msgs::msg::Marker cone;
         cone.header = header;
@@ -347,10 +370,10 @@ private:
 
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
-        double ttc_threshold = this->get_parameter("ttc_threshold").as_double();
-        double collision_dist_thresh = this->get_parameter("collision_distance_threshold").as_double();
-        double switch_cooldown_seconds = this->get_parameter("switch_cooldown_seconds").as_double();
-        double raceline_dist_thresh = this->get_parameter("raceline_distance_threshold").as_double();
+        double ttc_threshold = ttc_threshold_;
+        double collision_dist_thresh = collision_dist_thresh_;
+        double switch_cooldown_seconds = switch_cooldown_seconds_;
+        double raceline_dist_thresh = raceline_dist_thresh_;
 
         rclcpp::Time current_time = this->now();
         double elapsed_seconds = (current_time - last_switch_time_).seconds();
@@ -361,19 +384,22 @@ private:
         {
             try
             {
-                std::string base_frame = this->get_parameter("base_frame").as_string();
                 std::string target_frame = msg->header.frame_id; // Transform to laser frame for TTC
-                double ttc_lookahead = this->get_parameter("ttc_lookahead_distance").as_double();
+                if (target_frame.empty()) {
+                    target_frame = laser_frame_;
+                }
+                
+                double ttc_lookahead = ttc_lookahead_distance_;
                 
                 geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
-                    target_frame, latest_path_->header.frame_id, rclcpp::Time(0));
+                    target_frame, latest_path_->header.frame_id, tf2::TimePointZero);
 
                 // 1. Find the nearest point index
                 size_t nearest_idx = 0;
                 double min_dist_sq = std::numeric_limits<double>::max();
                 
                 geometry_msgs::msg::TransformStamped tf_inv = tf_buffer_->lookupTransform(
-                    latest_path_->header.frame_id, base_frame, rclcpp::Time(0));
+                    latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
                 double car_x = tf_inv.transform.translation.x;
                 double car_y = tf_inv.transform.translation.y;
 

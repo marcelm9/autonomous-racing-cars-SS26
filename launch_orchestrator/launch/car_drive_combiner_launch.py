@@ -78,12 +78,14 @@ def generate_launch_description():
                 parameters=[
                     {
                         "base_frame": "particle_filter_base_frame",
+                        "laser_frame": "laser",
                         "pp_input_topic": "/drive_pp",
                         "re_input_topic": "/drive_re",
                         "drive_output_topic": "/drive",
                         "scan_topic": "/scan",
                         "odom_topic": "/odom",
                         "ttc_threshold": 0.5,
+                        "visual_path_length": 2.0,
                     }
                 ],
             ),
