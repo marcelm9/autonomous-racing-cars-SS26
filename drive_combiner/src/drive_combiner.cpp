@@ -385,7 +385,7 @@ private:
             try
             {
                 std::string target_frame = msg->header.frame_id; // Transform to laser frame for TTC
-                if (target_frame.empty()) {
+                if (true) { //target_frame.empty()
                     target_frame = laser_frame_;
                 }
                 
