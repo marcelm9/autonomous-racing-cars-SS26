@@ -284,7 +284,7 @@ private:
         visualization_msgs::msg::Marker cone;
         cone.header = header;
         // MUST use the same frame as transformed_path_points_
-        cone.header.frame_id = header.frame_id; 
+        cone.header.frame_id = base_frame_; 
         cone.ns = "ttc_cone";
         cone.id = 1;
         cone.type = visualization_msgs::msg::Marker::TRIANGLE_LIST;
