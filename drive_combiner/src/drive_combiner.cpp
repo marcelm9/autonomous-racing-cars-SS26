@@ -518,14 +518,17 @@ private:
         geometry_msgs::msg::TransformStamped laser_to_base_tf;
         try
         {
-            // Sync with scan timestamp
+            // Sync with scan timestamp, add timeout
             laser_to_base_tf = tf_buffer_->lookupTransform(
-                base_frame_, laser_frame_, msg->header.stamp);
+                base_frame_, laser_frame_, msg->header.stamp, rclcpp::Duration::from_seconds(0.05));
         }
         catch (const tf2::TransformException &ex)
         {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Laser->Base transform missing: %s", ex.what());
-            return;
+            // Fallback to latest
+            try {
+                laser_to_base_tf = tf_buffer_->lookupTransform(base_frame_, laser_frame_, tf2::TimePointZero);
+            } catch (...) { return; }
         }
 
         // <-- TRANSFORM AND FILTER RACELINE HERE -->
@@ -538,16 +541,26 @@ private:
                 std::string target_frame = base_frame_;
                 double ttc_lookahead = ttc_lookahead_distance_;
 
-                // Sync with scan timestamp
-                geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
-                    target_frame, latest_path_->header.frame_id, msg->header.stamp);
+                // Sync with scan timestamp, add timeout
+                geometry_msgs::msg::TransformStamped tf;
+                try {
+                    tf = tf_buffer_->lookupTransform(
+                        target_frame, latest_path_->header.frame_id, msg->header.stamp, rclcpp::Duration::from_seconds(0.05));
+                } catch (...) {
+                    tf = tf_buffer_->lookupTransform(target_frame, latest_path_->header.frame_id, tf2::TimePointZero);
+                }
 
                 // Find the nearest point index
                 size_t nearest_idx = 0;
                 double min_dist_sq = std::numeric_limits<double>::max();
 
-                geometry_msgs::msg::TransformStamped tf_inv = tf_buffer_->lookupTransform(
-                    latest_path_->header.frame_id, base_frame_, msg->header.stamp);
+                geometry_msgs::msg::TransformStamped tf_inv;
+                try {
+                    tf_inv = tf_buffer_->lookupTransform(
+                        latest_path_->header.frame_id, base_frame_, msg->header.stamp, rclcpp::Duration::from_seconds(0.05));
+                } catch (...) {
+                    tf_inv = tf_buffer_->lookupTransform(latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
+                }
                 double car_x = tf_inv.transform.translation.x;
                 double car_y = tf_inv.transform.translation.y;
 
@@ -634,9 +647,11 @@ private:
                               "TTC: %.2f, MinDist: %.2f, Mode: %s",
                               min_ttc, min_dist, reactive_mode_active_ ? "REACTIVE" : "PURE_PURSUIT");
 
-        publish_mode_marker(msg->header.stamp);
-        publish_cone_marker(msg->header);
-        publish_ttc_marker(msg->header, min_ttc);
+        publish_mode_marker(this->now());
+        std_msgs::msg::Header current_header = msg->header;
+        current_header.stamp = this->now();
+        publish_cone_marker(current_header);
+        publish_ttc_marker(current_header, min_ttc);
     }
 
     void drive_pp_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
