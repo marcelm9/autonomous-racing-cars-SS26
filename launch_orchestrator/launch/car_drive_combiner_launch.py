@@ -109,7 +109,8 @@ def generate_launch_description():
                         "odom_topic": "/odom",
                         "ttc_threshold": 0.75,
                         "visual_path_length": 1.5,
-                        "vehicle_width": 0.25,
+                        "vehicle_width": 0.2,
+                        "safety_margin": 0.0,
                         
                     }
                 ],
