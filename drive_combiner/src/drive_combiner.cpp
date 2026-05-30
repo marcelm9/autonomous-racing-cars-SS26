@@ -91,6 +91,7 @@ public:
         drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_output_topic").as_string().c_str(), 10);
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/mode_marker", 10);
         cone_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/cone_marker", 10);
+        ttc_marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/ttc_marker", 10);
 
         // Register the dynamic parameter callback
         param_callback_handle_ = this->add_on_set_parameters_callback(
@@ -140,6 +141,7 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr cone_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ttc_marker_pub_;
 
     rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> &parameters)
     {
@@ -460,6 +462,48 @@ private:
         cone_pub_->publish(cone);
     }
 
+    void publish_ttc_marker(const std_msgs::msg::Header &header, double ttc)
+    {
+        visualization_msgs::msg::Marker marker;
+        marker.header = header;
+        marker.header.frame_id = base_frame_;
+        marker.ns = "ttc_text";
+        marker.id = 2;
+        marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        marker.pose.position.x = 0.0;
+        marker.pose.position.y = 0.0;
+        marker.pose.position.z = 1.0;
+        marker.pose.orientation.w = 1.0;
+
+        marker.scale.z = 0.4;
+
+        marker.color.a = 1.0;
+        marker.color.r = 1.0;
+        marker.color.g = 1.0;
+        marker.color.b = 1.0;
+
+        if (std::isinf(ttc))
+        {
+            marker.text = "TTC: INF";
+        }
+        else
+        {
+            char buffer[50];
+            snprintf(buffer, sizeof(buffer), "TTC: %.2f s", ttc);
+            marker.text = buffer;
+
+            if (ttc <= ttc_threshold_)
+            {
+                marker.color.g = 0.0;
+                marker.color.b = 0.0;
+            }
+        }
+
+        ttc_marker_pub_->publish(marker);
+    }
+
     void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
     {
         double ttc_threshold = ttc_threshold_;
@@ -474,9 +518,9 @@ private:
         geometry_msgs::msg::TransformStamped laser_to_base_tf;
         try
         {
-            // Override the message's frame_id with the TF tree's actual name
+            // Sync with scan timestamp
             laser_to_base_tf = tf_buffer_->lookupTransform(
-                base_frame_, laser_frame_, tf2::TimePointZero);
+                base_frame_, laser_frame_, msg->header.stamp);
         }
         catch (const tf2::TransformException &ex)
         {
@@ -494,15 +538,16 @@ private:
                 std::string target_frame = base_frame_;
                 double ttc_lookahead = ttc_lookahead_distance_;
 
+                // Sync with scan timestamp
                 geometry_msgs::msg::TransformStamped tf = tf_buffer_->lookupTransform(
-                    target_frame, latest_path_->header.frame_id, tf2::TimePointZero);
+                    target_frame, latest_path_->header.frame_id, msg->header.stamp);
 
                 // Find the nearest point index
                 size_t nearest_idx = 0;
                 double min_dist_sq = std::numeric_limits<double>::max();
 
                 geometry_msgs::msg::TransformStamped tf_inv = tf_buffer_->lookupTransform(
-                    latest_path_->header.frame_id, base_frame_, tf2::TimePointZero);
+                    latest_path_->header.frame_id, base_frame_, msg->header.stamp);
                 double car_x = tf_inv.transform.translation.x;
                 double car_y = tf_inv.transform.translation.y;
 
@@ -585,12 +630,13 @@ private:
             }
         }
 
-        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+        RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 500,
                               "TTC: %.2f, MinDist: %.2f, Mode: %s",
                               min_ttc, min_dist, reactive_mode_active_ ? "REACTIVE" : "PURE_PURSUIT");
 
         publish_mode_marker(msg->header.stamp);
         publish_cone_marker(msg->header);
+        publish_ttc_marker(msg->header, min_ttc);
     }
 
     void drive_pp_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
