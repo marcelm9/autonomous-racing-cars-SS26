@@ -28,6 +28,14 @@ FollowGap::FollowGap() : Node("reactive")
   this->declare_parameter<int>("reac_n_extend", this->N_EXTEND);
   this->declare_parameter<double>("reac_step_depth", this->STEP_DEPTH);
   this->declare_parameter<double>("continuity_weight", this->CONTINUITY_WEIGHT);
+  this->declare_parameter<double>("max_threshold", this->MAX_THRESHOLD);
+  this->declare_parameter<double>("min_threshold", this->MIN_THRESHOLD);
+  this->declare_parameter<int>("dyn_threshold_increment", this->DYN_THRESHOLD_INCREMENT);
+  this->declare_parameter<int>("n_gap_hits", static_cast<int>(this->N_GAP_HITS));
+  this->declare_parameter<double>("gap_view_angle_procent", this->GAP_VIEW_ANGLE_PROCENT);
+  this->declare_parameter<double>("sigma_front", this->SIGMA_FRONT);
+  this->declare_parameter<double>("sigma_side", this->SIGMA_SIDE);
+  this->declare_parameter<double>("sigma_amplitude", this->SIGMA_AMPLITUDE);
 
   // Initialize from parameters
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
@@ -36,6 +44,19 @@ FollowGap::FollowGap() : Node("reactive")
   this->get_parameter("reac_n_extend", this->N_EXTEND);
   this->get_parameter("reac_step_depth", this->STEP_DEPTH);
   this->get_parameter("continuity_weight", this->CONTINUITY_WEIGHT);
+  this->get_parameter("max_threshold", this->MAX_THRESHOLD);
+  this->get_parameter("min_threshold", this->MIN_THRESHOLD);
+  this->get_parameter("dyn_threshold_increment", this->DYN_THRESHOLD_INCREMENT);
+  
+  int n_gap_hits_int;
+  if (this->get_parameter("n_gap_hits", n_gap_hits_int)) {
+      this->N_GAP_HITS = static_cast<size_t>(n_gap_hits_int);
+  }
+
+  this->get_parameter("gap_view_angle_procent", this->GAP_VIEW_ANGLE_PROCENT);
+  this->get_parameter("sigma_front", this->SIGMA_FRONT);
+  this->get_parameter("sigma_side", this->SIGMA_SIDE);
+  this->get_parameter("sigma_amplitude", this->SIGMA_AMPLITUDE);
 
   // Register the dynamic parameter callback
   callback_handle_ = this->add_on_set_parameters_callback(
@@ -80,9 +101,43 @@ rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const st
         }
         else if (param.get_name() == "reac_n_extend") {
             this->N_EXTEND = param.as_int();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'reac_n_extend' updated to: %d", this->N_EXTEND);
         }
         else if (param.get_name() == "reac_step_depth") {
             this->STEP_DEPTH = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'reac_step_depth' updated to: %.2f", this->STEP_DEPTH);
+        }
+        else if (param.get_name() == "max_threshold") {
+            this->MAX_THRESHOLD = static_cast<float>(param.as_double());
+            RCLCPP_INFO(this->get_logger(), "Parameter 'max_threshold' updated to: %.2f", this->MAX_THRESHOLD);
+        }
+        else if (param.get_name() == "min_threshold") {
+            this->MIN_THRESHOLD = static_cast<float>(param.as_double());
+            RCLCPP_INFO(this->get_logger(), "Parameter 'min_threshold' updated to: %.2f", this->MIN_THRESHOLD);
+        }
+        else if (param.get_name() == "dyn_threshold_increment") {
+            this->DYN_THRESHOLD_INCREMENT = param.as_int();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'dyn_threshold_increment' updated to: %d", this->DYN_THRESHOLD_INCREMENT);
+        }
+        else if (param.get_name() == "n_gap_hits") {
+            this->N_GAP_HITS = static_cast<size_t>(param.as_int());
+            RCLCPP_INFO(this->get_logger(), "Parameter 'n_gap_hits' updated to: %zu", this->N_GAP_HITS);
+        }
+        else if (param.get_name() == "gap_view_angle_procent") {
+            this->GAP_VIEW_ANGLE_PROCENT = static_cast<float>(param.as_double());
+            RCLCPP_INFO(this->get_logger(), "Parameter 'gap_view_angle_procent' updated to: %.2f", this->GAP_VIEW_ANGLE_PROCENT);
+        }
+        else if (param.get_name() == "sigma_front") {
+            this->SIGMA_FRONT = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'sigma_front' updated to: %.2f", this->SIGMA_FRONT);
+        }
+        else if (param.get_name() == "sigma_side") {
+            this->SIGMA_SIDE = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'sigma_side' updated to: %.2f", this->SIGMA_SIDE);
+        }
+        else if (param.get_name() == "sigma_amplitude") {
+            this->SIGMA_AMPLITUDE = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'sigma_amplitude' updated to: %.2f", this->SIGMA_AMPLITUDE);
         }
     }
     return result;
