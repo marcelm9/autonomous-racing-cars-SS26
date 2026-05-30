@@ -36,8 +36,8 @@ public:
 
 private:
     // PARAMETERS
-    double MAXDRIVESPEED = 4.0;
-    double MINDRIVESPEED = 1.0;
+    double MAXDRIVESPEED = 6.0;
+    double MINDRIVESPEED = 3.0;
     double MAXDISTANCE = 7.0; // Gap Distance at which max speed is reached
     double BRAKE_TUNE = 0.1; //0.075; // higher --> brake later
 
