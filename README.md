@@ -122,5 +122,6 @@ python -m pip install casadi==3.5.5 opencv-contrib-python --no-deps
 ## Lap Timer
 To use the lap timer, create the file `<MAP_NAME>.checkpoints` in the directory `launch_orchestrator/maps`. Take inspiration from `crazy_map.checkpoints`. The first line is the starting line, every following line stands for one checkpoint. The format is `x1, y1, x2, y2`. Then add the node to the launch configuration (check out `sim_pure_pursuit_launch.py`).
 
-## drive_combiner
-publish: ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 particle_filter_base_frame laser2
+## Drive Combiner
+
+If the cone / lane shown in rviz2 (`/drive_combiner/cone_marker`) does not move with the car, you have to publish a static transform: `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 particle_filter_base_frame laser2`.
