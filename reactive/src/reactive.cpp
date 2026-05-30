@@ -399,7 +399,7 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   }
 
   // Combine both factors to determine optimal speed multiplier [0.0, 1.0]
-  double speed_factor = (distance_factor + angle_factor) / 2.0;
+  double speed_factor = distance_factor * angle_factor;
 
   // Force speed multiplier to 0 if the robot is stuck
   if (oh_no_im_stuck) {
