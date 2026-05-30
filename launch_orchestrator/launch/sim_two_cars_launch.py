@@ -78,10 +78,13 @@ def generate_launch_description():
                     {
                         "pp_input_topic": "ego_racecar/drive_pp",
                         "re_input_topic": "ego_racecar/drive_re",
-                        "drive_output_topic": "ego_racecar/drive",
+                        "drive_output_topic": "ego_racecar/driveaendadhueuid",
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
                         "ttc_threshold": 0.5,
+                        "ttc_cone_width_deg": 10.0,
+                        "raceline_distance_threshold": 0.25,
+                        "visual_path_length": 2.0,
                     }
                 ],
             ),
@@ -95,7 +98,21 @@ def generate_launch_description():
                         "scan_topic": "opp_racecar/scan",
                         "odom_topic": "opp_racecar/odom",
                         "drive_topic": "opp_racecar/drive",
+                        "min_speed": 0.5,
                         "max_speed": 3.0,
+                        "reac_n_extend": 200
+                    }
+                ],
+            ),
+            Node(
+                package="strategist",
+                executable="strategist",
+                name="strategist",
+                output="screen",
+                parameters=[
+                    {
+                        "map_name": map_name,
+                        "base_frame": "ego_racecar/base_link",
                     }
                 ],
             ),

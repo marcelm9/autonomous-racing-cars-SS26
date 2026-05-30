@@ -28,8 +28,8 @@ git clone https://github.com/f1tenth/range_libc
 cd range_libc/pywrapper
 ./compile.sh
 
-# foxglove
-yes | sudo apt install ros-jazzy-foxglove-bridge
+# # foxglove
+# yes | sudo apt install ros-jazzy-foxglove-bridge
 
 # syntax highlighting
 mkdir /arc2026/ws/.vscode
