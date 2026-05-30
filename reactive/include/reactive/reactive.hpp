@@ -45,7 +45,7 @@ private:
     float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t N_GAP_HITS = 20; // Need at least
+    size_t N_GAP_HITS = 65; // Need at least
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
 
     double SIGMA_FRONT = 2.4;
