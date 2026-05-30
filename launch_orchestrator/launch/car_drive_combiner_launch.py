@@ -72,7 +72,7 @@ def generate_launch_description():
                         "drive_topic": "/drive_re",
                         "max_speed": 2.0,
                         "min_speed": 1.0,
-                        "reac_n_extend": 300.0,
+                        "reac_n_extend": 300,
                     }
                 ],
             ),
