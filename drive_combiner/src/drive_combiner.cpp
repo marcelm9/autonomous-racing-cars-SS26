@@ -88,6 +88,10 @@ public:
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/mode_marker", 10);
         cone_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/drive_combiner/cone_marker", 10);
 
+        // Register the dynamic parameter callback
+        param_callback_handle_ = this->add_on_set_parameters_callback(
+            std::bind(&DriveCombiner::parameters_callback, this, std::placeholders::_1));
+
         RCLCPP_INFO(this->get_logger(), "Drive Combiner Node Started.");
     }
 
@@ -117,6 +121,8 @@ private:
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
+
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pp_sub_;
@@ -126,6 +132,68 @@ private:
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr cone_pub_;
+
+    rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> &parameters)
+    {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+        result.reason = "success";
+
+        for (const auto &param : parameters)
+        {
+            if (param.get_name() == "ttc_threshold" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                ttc_threshold_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'ttc_threshold' updated to: %.2f", ttc_threshold_);
+            }
+            else if (param.get_name() == "collision_distance_threshold" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                collision_dist_thresh_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'collision_distance_threshold' updated to: %.2f", collision_dist_thresh_);
+            }
+            else if (param.get_name() == "switch_cooldown_seconds" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                switch_cooldown_seconds_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'switch_cooldown_seconds' updated to: %.2f", switch_cooldown_seconds_);
+            }
+            else if (param.get_name() == "raceline_distance_threshold" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                raceline_dist_thresh_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'raceline_distance_threshold' updated to: %.2f", raceline_dist_thresh_);
+            }
+            else if (param.get_name() == "vehicle_width" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                vehicle_width_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'vehicle_width' updated to: %.2f", vehicle_width_);
+            }
+            else if (param.get_name() == "safety_margin" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                safety_margin_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'safety_margin' updated to: %.2f", safety_margin_);
+            }
+            else if (param.get_name() == "ttc_lookahead_distance" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                ttc_lookahead_distance_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'ttc_lookahead_distance' updated to: %.2f", ttc_lookahead_distance_);
+            }
+            else if (param.get_name() == "visual_path_length" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+                visual_path_length_ = param.as_double();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'visual_path_length' updated to: %.2f", visual_path_length_);
+            }
+            else if (param.get_name() == "base_frame" && param.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
+            {
+                base_frame_ = param.as_string();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'base_frame' updated to: %s", base_frame_.c_str());
+            }
+            else if (param.get_name() == "laser_frame" && param.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
+            {
+                laser_frame_ = param.as_string();
+                RCLCPP_INFO(this->get_logger(), "Parameter 'laser_frame' updated to: %s", laser_frame_.c_str());
+            }
+        }
+        return result;
+    }
 
     void path_callback(const nav_msgs::msg::Path::SharedPtr msg)
     {
