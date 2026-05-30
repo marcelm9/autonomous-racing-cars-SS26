@@ -2,7 +2,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, LogInfo
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -18,6 +18,7 @@ def generate_launch_description():
     raceline_file = PythonExpression([
         "'", map_name, "' + ('_' + '", raceline_index, "' if '", raceline_index, "' else '')"
     ])
+    
 
     return LaunchDescription(
         [
@@ -31,6 +32,17 @@ def generate_launch_description():
                 default_value="",
                 description="Optional raceline index.",
             ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(
+                        get_package_share_directory("f1tenth_gym_ros"),
+                        "launch",
+                        "gym_bridge_launch.py",
+                    )
+                )
+            ),
+
+            LogInfo(msg=["raceline_file: ", raceline_file]),
 
             Node(
                 package="opt_raceline",
