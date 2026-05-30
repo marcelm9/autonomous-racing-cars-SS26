@@ -83,9 +83,9 @@ public:
 
         path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
             this->get_parameter("path_topic").as_string().c_str(), 1, std::bind(&DriveCombiner::path_callback, this, _1));
-        // subscribe to String /strategist/strategy
-        strategy_sub_ = this->create_subscription<std_msgs::msg::String>(
+        /*strategy_sub_ = this->create_subscription<std_msgs::msg::String>(
             "/strategist/strategy", 10, std::bind(&DriveCombiner::strategy_callback, this, _1));
+        */
 
         // publishers
         drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_output_topic").as_string().c_str(), 10);
@@ -109,9 +109,9 @@ private:
 
     bool reactive_mode_active_;
     double last_pp_steering_ = 0.0;
-    double last_re_speed_ = 0.0;
-    bool overtaking_allowed_ = true;
-    bool old_overtake_strategy_ = true;
+    //double last_re_speed_ = 0.0;
+    //bool overtaking_allowed_ = true;
+    //bool old_overtake_strategy_ = true;
     rclcpp::Time last_switch_time_;
 
     std::string base_frame_;
@@ -595,50 +595,50 @@ private:
 
     void drive_pp_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
     {
-        last_pp_steering_ = msg->drive.steering_angle;
+        // last_pp_steering_ = msg->drive.steering_angle;
 
         if (!reactive_mode_active_)
         {
             drive_pub_->publish(*msg);
         }
-        else if (reactive_mode_active_ && (!overtaking_allowed_))
-        {
-            // If overtaking is not allowed, we still want to publish the PP steering angle but with reactive speed.
-            ackermann_msgs::msg::AckermannDriveStamped modified_msg = *msg;
-            modified_msg.drive.speed = last_re_speed_;
-            drive_pub_->publish(modified_msg);
-        }
+        // else if (reactive_mode_active_ && (!overtaking_allowed_))
+        // {
+        //     // If overtaking is not allowed, we still want to publish the PP steering angle but with reactive speed.
+        //     ackermann_msgs::msg::AckermannDriveStamped modified_msg = *msg;
+        //     modified_msg.drive.speed = last_re_speed_;
+        //     drive_pub_->publish(modified_msg);
+        // }
         
     }
 
     void drive_re_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
     {
-        last_re_speed_ = msg->drive.speed;
-        if (reactive_mode_active_ && overtaking_allowed_)
+        // last_re_speed_ = msg->drive.speed;
+        if (reactive_mode_active_)
         {
             drive_pub_->publish(*msg);
         }
     }
 
-    void strategy_callback(const std_msgs::msg::String::SharedPtr msg)
-    {
-        if (msg->data == "aggressive")
-        {
-            if (old_overtake_strategy_ != true) {
-                RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to AGGRESSIVE");
-            }
-            overtaking_allowed_ = true;
-            old_overtake_strategy_ = true;
-        }
-        else if (msg->data == "defensive")
-        {
-            if (old_overtake_strategy_ != false) {
-                RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to DEFENSIVE");
-            }
-            overtaking_allowed_ = false;
-            old_overtake_strategy_ = false;
-        }
-    }
+    // void strategy_callback(const std_msgs::msg::String::SharedPtr msg)
+    // {
+    //     if (msg->data == "aggressive")
+    //     {
+    //         if (old_overtake_strategy_ != true) {
+    //             RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to AGGRESSIVE");
+    //         }
+    //         overtaking_allowed_ = true;
+    //         old_overtake_strategy_ = true;
+    //     }
+    //     else if (msg->data == "defensive")
+    //     {
+    //         if (old_overtake_strategy_ != false) {
+    //             RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to DEFENSIVE");
+    //         }
+    //         overtaking_allowed_ = false;
+    //         old_overtake_strategy_ = false;
+    //     }
+    // }
 };
 
 int main(int argc, char **argv)
