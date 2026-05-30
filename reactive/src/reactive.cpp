@@ -24,6 +24,7 @@ FollowGap::FollowGap() : Node("reactive")
   // variables
   this->declare_parameter<double>("max_speed", this->MAXDRIVESPEED);
   this->declare_parameter<double>("min_speed", this->MINDRIVESPEED);
+  this->declare_parameter<double>("distance_threshold_for_max_speed", this->MAXDISTANCE);
   this->declare_parameter<int>("reac_n_extend", this->N_EXTEND);
   this->declare_parameter<double>("reac_step_depth", this->STEP_DEPTH);
   this->declare_parameter<double>("continuity_weight", this->CONTINUITY_WEIGHT);
@@ -31,6 +32,7 @@ FollowGap::FollowGap() : Node("reactive")
   // Initialize from parameters
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
   this->get_parameter("min_speed", this->MINDRIVESPEED);
+  this->get_parameter("distance_threshold_for_max_speed", this->MAXDISTANCE);
   this->get_parameter("reac_n_extend", this->N_EXTEND);
   this->get_parameter("reac_step_depth", this->STEP_DEPTH);
   this->get_parameter("continuity_weight", this->CONTINUITY_WEIGHT);
@@ -67,6 +69,10 @@ rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const st
         else if (param.get_name() == "min_speed") { // Handle dynamic updates for min_speed
             this->MINDRIVESPEED = param.as_double();
             RCLCPP_INFO(this->get_logger(), "Parameter 'min_speed' updated to: %.2f", this->MINDRIVESPEED);
+        }
+        else if (param.get_name() == "distance_threshold_for_max_speed") {
+            this->MAXDISTANCE = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'distance_threshold_for_max_speed' updated to: %.2f", this->MAXDISTANCE);
         }
         else if (param.get_name() == "continuity_weight") {
             this->CONTINUITY_WEIGHT = param.as_double();
@@ -389,11 +395,11 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
   // Distance Factor: Normalize chosen gap depth (0.0 = close, 1.0 = max depth)
   double distance_factor = 0.0;
   if (this->MAX_THRESHOLD > 0.0) {
-    distance_factor = std::min(chosen_gap_dist / this->MAX_THRESHOLD, 1.0);
+    distance_factor = std::min(chosen_gap_dist / this->MAXDISTANCE, 1.0);
   }
 
   // Combine both factors to determine optimal speed multiplier [0.0, 1.0]
-  double speed_factor = distance_factor * angle_factor;
+  double speed_factor = (distance_factor + angle_factor) / 2.0;
 
   // Force speed multiplier to 0 if the robot is stuck
   if (oh_no_im_stuck) {
