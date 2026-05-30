@@ -90,8 +90,9 @@ def generate_launch_description():
                         "drive_output_topic": "/drive",
                         "scan_topic": "/scan",
                         "odom_topic": "/odom",
-                        "ttc_threshold": 0.5,
-                        "visual_path_length": 2.0,
+                        "ttc_threshold": 0.75,
+                        "visual_path_length": 1.5,
+                        
                     }
                 ],
             ),
