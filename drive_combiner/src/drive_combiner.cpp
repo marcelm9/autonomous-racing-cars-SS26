@@ -12,6 +12,7 @@
 #include "tf2_ros/transform_listener.hpp"
 #include "tf2_ros/buffer.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "std_msgs/msg/string.hpp"
 
 using std::placeholders::_1;
 
@@ -82,6 +83,9 @@ public:
 
         path_sub_ = this->create_subscription<nav_msgs::msg::Path>(
             this->get_parameter("path_topic").as_string().c_str(), 1, std::bind(&DriveCombiner::path_callback, this, _1));
+        // subscribe to String /strategist/strategy
+        strategy_sub_ = this->create_subscription<std_msgs::msg::String>(
+            "/strategist/strategy", 10, std::bind(&DriveCombiner::strategy_callback, this, _1));
 
         // publishers
         drive_pub_ = this->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>(this->get_parameter("drive_output_topic").as_string().c_str(), 10);
@@ -101,6 +105,8 @@ private:
 
     bool reactive_mode_active_;
     double last_pp_steering_ = 0.0;
+    double last_re_speed_ = 0.0;
+    bool overtaking_allowed_ = true;
     rclcpp::Time last_switch_time_;
 
     std::string base_frame_;
@@ -123,6 +129,7 @@ private:
     rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_re_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr goal_sub_;
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr strategy_sub_;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr cone_pub_;
@@ -525,13 +532,36 @@ private:
         {
             drive_pub_->publish(*msg);
         }
+        else if (reactive_mode_active_ && (!overtaking_allowed_))
+        {
+            // If overtaking is not allowed, we still want to publish the PP steering angle but with reactive speed.
+            ackermann_msgs::msg::AckermannDriveStamped modified_msg = *msg;
+            modified_msg.drive.speed = last_re_speed_;
+            drive_pub_->publish(modified_msg);
+        }
+        
     }
 
     void drive_re_callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
     {
-        if (reactive_mode_active_)
+        last_re_speed_ = msg->drive.speed;
+        if (reactive_mode_active_ && overtaking_allowed_)
         {
             drive_pub_->publish(*msg);
+        }
+    }
+
+    void strategy_callback(const std_msgs::msg::String::SharedPtr msg)
+    {
+
+        RCLCPP_INFO(this->get_logger(), msg->data.c_str());
+        if (msg->data == "aggressive")
+        {
+            overtaking_allowed_ = true;
+        }
+        else if (msg->data == "defensive")
+        {
+            overtaking_allowed_ = false;
         }
     }
 };
