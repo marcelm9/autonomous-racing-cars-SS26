@@ -111,6 +111,7 @@ private:
     double last_pp_steering_ = 0.0;
     double last_re_speed_ = 0.0;
     bool overtaking_allowed_ = true;
+    bool old_overtake_strategy_ = true;
     rclcpp::Time last_switch_time_;
 
     std::string base_frame_;
@@ -621,15 +622,21 @@ private:
 
     void strategy_callback(const std_msgs::msg::String::SharedPtr msg)
     {
-
-        RCLCPP_INFO(this->get_logger(), msg->data.c_str());
         if (msg->data == "aggressive")
         {
+            if (old_overtake_strategy_ != true) {
+                RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to AGGRESSIVE");
+            }
             overtaking_allowed_ = true;
+            old_overtake_strategy_ = true;
         }
         else if (msg->data == "defensive")
         {
+            if (old_overtake_strategy_ != false) {
+                RCLCPP_INFO(this->get_logger(), "Overtaking strategy switched to DEFENSIVE");
+            }
             overtaking_allowed_ = false;
+            old_overtake_strategy_ = false;
         }
     }
 };
