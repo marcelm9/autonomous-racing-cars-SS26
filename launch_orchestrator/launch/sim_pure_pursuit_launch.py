@@ -6,22 +6,32 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.actions import DeclareLaunchArgument
+
 
 
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
+    raceline_index = LaunchConfiguration("raceline_index")
+
+    raceline_file = PythonExpression([
+        "'", map_name, "' + ('_' + '", raceline_index, "' if '", raceline_index, "' else '')"
+    ])
 
     return LaunchDescription(
         [
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(
-                        get_package_share_directory("f1tenth_gym_ros"),
-                        "launch",
-                        "gym_bridge_launch.py",
-                    )
-                )
+            DeclareLaunchArgument(
+                "map_name",
+                description="Map name. Must be passed when launching.",
             ),
+
+            DeclareLaunchArgument(
+                "raceline_index",
+                default_value="",
+                description="Optional raceline index.",
+            ),
+
             Node(
                 package="opt_raceline",
                 executable="raceline_csv_publisher",
@@ -29,7 +39,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "map_name": map_name,
+                        "map_name": raceline_file,
                     }
                 ],
             ),
