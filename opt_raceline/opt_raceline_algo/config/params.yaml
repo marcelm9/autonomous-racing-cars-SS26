@@ -5,8 +5,8 @@ map_img_ext: '.pgm'
 # The following params are for path generator
 num_lanes: 2
 clockwise: False
-inner_safe_dist: 0.25
-outer_safe_dist: 0.25
+inner_safe_dist: 0.5
+outer_safe_dist: 0.5
 opp_safe_dist: 0.2
 
 # The following params are for opponent predictor
