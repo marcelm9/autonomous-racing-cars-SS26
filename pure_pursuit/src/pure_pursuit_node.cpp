@@ -19,6 +19,7 @@
 #include "msgs/msg/raceline.hpp"
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include "std_msgs/msg/bool.hpp"
 
 class RacelinePurePursuitNode : public rclcpp::Node
 {
@@ -135,6 +136,10 @@ public:
     marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "/raceline/live_velocity_markers", 10);
 
+    update_raceline_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+        "new_raceline_published", 10,
+        std::bind(&RacelinePurePursuitNode::new_map_boolean_sub_callback, this, std::placeholders::_1));
+
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         this->get_parameter("odom_topic").as_string(),
@@ -161,8 +166,8 @@ public:
 private:
   void racelineCallback(const msgs::msg::Raceline::SharedPtr msg)
   {
-    raceline_.clear();
-    raceline_.reserve(msg->points.size());
+    raceline_new_.clear();
+    raceline_new_.reserve(msg->points.size());
     for (const auto &p : msg->points)
       {
         pure_pursuit::RacelinePoint point;
@@ -173,24 +178,34 @@ private:
         point.kappa_radpm = p.kappa_radpm;
         point.vx_mps = p.vx_mps;
         point.ax_mps2 = p.ax_mps2;
-        raceline_.push_back(point);
+        raceline_new_.push_back(point);
       }
-    this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
+  }
 
-    if (!raceline_error_initialized) {      
-      std::cout << "init error vector" << std::endl;
+  void new_map_boolean_sub_callback(const std_msgs::msg::Bool::SharedPtr msg)
+  {
+
+    if (msg->data) {
+      this->raceline_ = this->raceline_new_;
+      this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
+
+     
       std::vector<double> err_hist(raceline_.size(), 0.0); 
       raceline_error_history = err_hist;
       raceline_speed_history = err_hist;
       raceline_odom_speed_history = err_hist;
       raceline_error_initialized = true;
+
+
+      RCLCPP_INFO(
+          this->get_logger(),
+          "Received new raceline with %zu points, closed length %.2f m",
+          raceline_.size(),
+          pure_pursuit::computeClosedTrackLength(raceline_));
+    } else {
+
     }
 
-    RCLCPP_INFO_ONCE(
-        this->get_logger(),
-        "Received raceline with %zu points, closed length %.2f m",
-        raceline_.size(),
-        pure_pursuit::computeClosedTrackLength(raceline_));
   }
 
 
@@ -454,6 +469,7 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<msgs::msg::Raceline>::SharedPtr raceline_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr update_raceline_sub_;
   rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr goal_pub_;
   rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr nearest_pub_;
@@ -463,6 +479,7 @@ private:
   // Callback handle to keep the parameter event listener alive
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
+  std::vector<pure_pursuit::RacelinePoint> raceline_new_;
   std::vector<pure_pursuit::RacelinePoint> raceline_;
   std::string map_frame_;
   std::string base_frame_;
