@@ -4,20 +4,20 @@ import csv
 import math
 import os
 import threading
-from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import rclpy
-from rclpy.node import Node
-
-from msgs.msg import Raceline, RacelinePoint
-from nav_msgs.msg import Path as PathMsg
-from geometry_msgs.msg import PoseStamped
-from visualization_msgs.msg import Marker, MarkerArray
-
 from ament_index_python.packages import (
     get_package_share_directory,
 )
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path as PathMsg
+from rclpy.node import Node
+from std_msgs.msg import Bool
+from visualization_msgs.msg import Marker, MarkerArray
+
+from msgs.msg import Raceline, RacelinePoint
 
 REQUIRED_COLUMNS = (
     "s_m",
@@ -74,6 +74,11 @@ class RacelineCsvPublisher(Node):
             MarkerArray, "/raceline/speed_markers", 10
         )
 
+        # Create publisher for the new_raceline event
+        self.new_raceline_event_pub = self.create_publisher(
+            Bool, "/new_raceline_published", 10
+        )
+
         # Initialize with empty messages to prevent crashes before data arrives
         self.raceline_msg = Raceline()
         self.raceline_msg.header.frame_id = self.frame_id
@@ -121,6 +126,7 @@ class RacelineCsvPublisher(Node):
         self.get_logger().info(
             " -> /raceline/speed_markers (visualization_msgs/msg/MarkerArray)"
         )
+        self.get_logger().info(" -> /new_raceline_published (std_msgs/msg/Bool)")
 
     def resolve_csv_path(self, map_name: str) -> str:
         path = os.path.join(
@@ -359,6 +365,11 @@ class RacelineCsvPublisher(Node):
                     # Update node state thread-safely (reference assignment is atomic in Python)
                     node.raceline_msg = new_raceline_msg
                     node.path_msg = new_path_msg
+
+                    # Publish a Bool to let the system know a new raceline arrived
+                    bool_msg = Bool()
+                    bool_msg.data = True
+                    node.new_raceline_event_pub.publish(bool_msg)
 
                     node.get_logger().info(
                         f"[HTTP] Successfully updated live raceline! New point count: {len(new_raceline_msg.points)}"
