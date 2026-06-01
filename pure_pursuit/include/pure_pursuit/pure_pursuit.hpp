@@ -24,7 +24,8 @@ namespace pure_pursuit
   std::size_t findNearestPointIndex(
       const std::vector<RacelinePoint> &raceline,
       double x_m,
-      double y_m);
+      double y_m,
+      int delay_correction);
 
   std::size_t findLookaheadPointIndex(
       const std::vector<RacelinePoint> &raceline,

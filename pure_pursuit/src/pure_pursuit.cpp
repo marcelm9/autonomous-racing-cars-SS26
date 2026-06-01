@@ -220,7 +220,8 @@ namespace pure_pursuit
   std::size_t findNearestPointIndex(
       const std::vector<RacelinePoint> &raceline,
       double x_m,
-      double y_m)
+      double y_m,
+      int delay_correction)
   {
     if (raceline.empty())
     {
@@ -241,6 +242,7 @@ namespace pure_pursuit
         nearest_index = i;
       }
     }
+    nearest_index = (nearest_index + delay_correction) % raceline.size();
 
     return nearest_index;
   }

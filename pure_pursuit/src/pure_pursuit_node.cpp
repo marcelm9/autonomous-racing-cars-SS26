@@ -44,6 +44,7 @@ public:
     this->declare_parameter<double>("adaptive_control_speed_up_factor", 1.0);
     this->declare_parameter<bool>("do_linear_speed_scaling", true);
     this->declare_parameter<double>("mps_speed_gain_for_nonlinear_speed_output", 1.0);
+    this->declare_parameter<int>("delay_correction", 1);
 
 
     map_frame_ = this->get_parameter("map_frame").as_string();
@@ -61,6 +62,7 @@ public:
     speed_up_factor = this->get_parameter("adaptive_control_speed_up_factor").as_double();
     do_linear_speed_scaling = this->get_parameter("do_linear_speed_scaling").as_bool();
     mps_speed_gain = this->get_parameter("mps_speed_gain_for_nonlinear_speed_output").as_double();
+    delay_correction = this->get_parameter("delay_correction").as_int();
 
     // Setup the parameter update callback for dynamic rqt/CLI tuning
     param_callback_handle_ = this->add_on_set_parameters_callback(
@@ -113,6 +115,10 @@ public:
             else if (param.get_name() == "mps_speed_gain_for_nonlinear_speed_output" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
             {
               mps_speed_gain = param.as_double();
+            }
+            else if (param.get_name() == "delay_correction" && param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER)
+            {
+              delay_correction = param.as_int();
             }
           }
           return result;
@@ -249,7 +255,7 @@ private:
     const double car_y = map_to_base.transform.translation.y;
 
     const std::size_t nearest_index =
-        pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y);
+        pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y, this->delay_correction);
 
     const double lookahead_m = pure_pursuit::computeMpsDependentLookahead(
         min_mps_,
@@ -336,6 +342,9 @@ private:
         wheelbase_,
         max_steering_angle_);
 
+
+    std::cout << steering_angle << std::endl;
+
     double target_speed = min_speed_;
     if (do_linear_speed_scaling) {
       target_speed = pure_pursuit::computeMpsDependentSpeed(
@@ -398,7 +407,11 @@ private:
   {
     visualization_msgs::msg::MarkerArray marker_array;
     int marker_id = 0;
-    int skip_n = 5;
+
+    double target_spacing = 0.25;
+    int skip_n = static_cast<int>(std::round(target_spacing / this->distance_between_two_raceline_points));
+    if (skip_n < 1) skip_n = 1;  // ensure at least 1 to avoid division by zero or skipping nothing
+
     for (std::size_t idx = 0; idx < raceline_.size(); ++idx)
     {
         // skip points: only process every nth point
@@ -479,6 +492,7 @@ private:
   bool do_linear_speed_scaling = true;
   double mps_speed_gain = 1.0;
   double current_car_speed = 0.0;
+  int delay_correction = 0;
 };
 
 int main(int argc, char **argv)
