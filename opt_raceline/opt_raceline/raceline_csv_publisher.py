@@ -41,11 +41,11 @@ class RacelineCsvPublisher(Node):
 
         self.declare_parameter("map_name")
         self.declare_parameter("frame_id", "map")
-        self.declare_parameter("publish_rate", 3.0)
+        self.declare_parameter("publish_rate", 1.0)
 
         self.csv_path = self.resolve_csv_path(self.get_parameter("map_name").value)
         self.get_logger().info(f"Resolved raceline CSV path: {self.csv_path}")
-        
+
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
 
@@ -60,8 +60,10 @@ class RacelineCsvPublisher(Node):
             "/raceline/path",
             10,
         )
-        
-        self.speed_marker_pub = self.create_publisher(MarkerArray, "/raceline/speed_markers", 10)
+
+        self.speed_marker_pub = self.create_publisher(
+            MarkerArray, "/raceline/speed_markers", 10
+        )
 
         try:
             self.raceline_msg = self.load_raceline_csv(self.csv_path)
@@ -212,14 +214,6 @@ class RacelineCsvPublisher(Node):
         return path_msg
 
     def publish(self):
-        # Reload the CSV file every publish cycle
-        try:
-            self.raceline_msg = self.load_raceline_csv(self.csv_path)
-            self.path_msg = self.create_path_msg(self.raceline_msg)
-        except Exception as exc:
-            self.get_logger().error(f"Failed to reload raceline CSV: {exc}")
-            return
-        
         stamp = self.get_clock().now().to_msg()
 
         self.raceline_msg.header.stamp = stamp
@@ -227,14 +221,13 @@ class RacelineCsvPublisher(Node):
 
         for pose in self.path_msg.poses:
             pose.header.stamp = stamp
-            
+
         speed_marker_array = self.create_speed_marker_array(self.raceline_msg, stamp)
 
         self.raceline_pub.publish(self.raceline_msg)
         self.path_pub.publish(self.path_msg)
         self.speed_marker_pub.publish(speed_marker_array)
-        
-        
+
     def create_speed_marker_array(self, raceline_msg: Raceline, stamp) -> MarkerArray:
         marker_array = MarkerArray()
 
