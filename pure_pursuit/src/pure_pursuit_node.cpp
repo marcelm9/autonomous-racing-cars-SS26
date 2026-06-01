@@ -161,11 +161,9 @@ public:
 private:
   void racelineCallback(const msgs::msg::Raceline::SharedPtr msg)
   {
-    if (!raceline_error_initialized) {      
-      raceline_.clear();
-      raceline_.reserve(msg->points.size());
-
-      for (const auto &p : msg->points)
+    raceline_.clear();
+    raceline_.reserve(msg->points.size());
+    for (const auto &p : msg->points)
       {
         pure_pursuit::RacelinePoint point;
         point.s_m = p.s_m;
@@ -177,15 +175,15 @@ private:
         point.ax_mps2 = p.ax_mps2;
         raceline_.push_back(point);
       }
+    this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
 
+    if (!raceline_error_initialized) {      
       std::cout << "init error vector" << std::endl;
       std::vector<double> err_hist(raceline_.size(), 0.0); 
       raceline_error_history = err_hist;
       raceline_speed_history = err_hist;
       raceline_odom_speed_history = err_hist;
       raceline_error_initialized = true;
-
-      this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
     }
 
     RCLCPP_INFO_ONCE(
