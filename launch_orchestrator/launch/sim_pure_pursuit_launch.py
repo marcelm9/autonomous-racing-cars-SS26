@@ -76,7 +76,7 @@ def generate_launch_description():
                         "target_speed_scaling": 1.0,
                         "min_speed": 1.0,
                         "max_speed": 4.0,
-                        "do_linear_speed_scaling": False,
+                        "do_linear_speed_scaling": True,
                         "curvature_speed_gain": -0.2,
                         "do_error_based_adaptive_speed_control": False,
                         "adaptive_control_slowing_factor": 1.0,
