@@ -41,7 +41,7 @@ class RacelineCsvPublisher(Node):
 
         self.declare_parameter("map_name")
         self.declare_parameter("frame_id", "map")
-        self.declare_parameter("publish_rate", 1.0)
+        self.declare_parameter("publish_rate", 3.0)
 
         self.csv_path = self.resolve_csv_path(self.get_parameter("map_name").value)
         self.get_logger().info(f"Resolved raceline CSV path: {self.csv_path}")
@@ -212,6 +212,14 @@ class RacelineCsvPublisher(Node):
         return path_msg
 
     def publish(self):
+        # Reload the CSV file every publish cycle
+        try:
+            self.raceline_msg = self.load_raceline_csv(self.csv_path)
+            self.path_msg = self.create_path_msg(self.raceline_msg)
+        except Exception as exc:
+            self.get_logger().error(f"Failed to reload raceline CSV: {exc}")
+            return
+        
         stamp = self.get_clock().now().to_msg()
 
         self.raceline_msg.header.stamp = stamp
