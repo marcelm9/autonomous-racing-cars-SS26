@@ -41,6 +41,13 @@ def generate_launch_description():
                         "scan_topic": "/scan",
                         "odom_topic": "/odom",
                         "drive_topic": "/drive",
+                        "max_speed": 7.0,
+                        "min_speed": 1.75,
+                        "n_gap_hits": 100,
+                        "speed_smoothing": 0.2,                     
+                        "exp_angle": 0.5,
+                        "exp_distance": 0.4,
+                        "reac_n_extend": 200,
                     }
                 ],
             ),
