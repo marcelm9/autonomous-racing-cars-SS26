@@ -45,17 +45,17 @@ class RacelineCsvPublisher(Node):
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
 
-        # New parameters for deciding source and configuring the HTTP server
-        self.declare_parameter("source_mode", "csv")  # "csv" or "http"
+        # HTTP Server configuration
+        self.declare_parameter("allow_http_updates", True)
         self.declare_parameter("http_port", 8000)
 
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
-        self.source_mode = self.get_parameter("source_mode").value
+        self.allow_http_updates = self.get_parameter("allow_http_updates").value
         self.http_port = self.get_parameter("http_port").value
 
         self.get_logger().info(
-            f"Configuration: source_mode='{self.source_mode}', frame_id='{self.frame_id}', publish_rate={self.publish_rate}Hz"
+            f"Configuration: frame_id='{self.frame_id}', publish_rate={self.publish_rate}Hz, allow_http_updates={self.allow_http_updates}"
         )
 
         self.raceline_pub = self.create_publisher(
@@ -80,36 +80,36 @@ class RacelineCsvPublisher(Node):
         self.path_msg = PathMsg()
         self.path_msg.header.frame_id = self.frame_id
 
-        # --- Handle Source Mode ---
-        if self.source_mode == "csv":
-            map_name = self.get_parameter("map_name").value
-            try:
-                self.csv_path = self.resolve_csv_path(map_name)
-                self.get_logger().info(
-                    f"Attempting to load CSV raceline from: {self.csv_path}"
-                )
-                self.raceline_msg = self.load_raceline_csv(self.csv_path)
-                self.path_msg = self.create_path_msg(self.raceline_msg)
-
-                self.get_logger().info(
-                    f"Successfully loaded raceline! Total points: {len(self.raceline_msg.points)}"
-                )
-            except Exception as exc:
-                self.get_logger().error(
-                    f"Failed to load raceline CSV '{map_name}': {exc}"
-                )
-
-        elif self.source_mode == "http":
+        # --- 1. Base Initialization (Always attempt to load CSV first) ---
+        map_name = self.get_parameter("map_name").value
+        try:
+            self.csv_path = self.resolve_csv_path(map_name)
             self.get_logger().info(
-                f"Mode set to 'http'. Booting up HTTP server on port {self.http_port}..."
+                f"Attempting to load base CSV raceline from: {self.csv_path}"
+            )
+            self.raceline_msg = self.load_raceline_csv(self.csv_path)
+            self.path_msg = self.create_path_msg(self.raceline_msg)
+
+            self.get_logger().info(
+                f"Successfully loaded base raceline! Total points: {len(self.raceline_msg.points)}"
+            )
+        except Exception as exc:
+            self.get_logger().error(
+                f"Failed to load base raceline CSV '{map_name}': {exc}"
+            )
+
+        # --- 2. Live Update Initialization (Optional HTTP Server) ---
+        if self.allow_http_updates:
+            self.get_logger().info(
+                f"HTTP live updates enabled. Booting up HTTP server on port {self.http_port}..."
             )
             self.start_http_server()
         else:
-            self.get_logger().error(
-                f"Invalid source_mode '{self.source_mode}'. Must be 'csv' or 'http'."
+            self.get_logger().info(
+                "HTTP live updates disabled via parameter. Running in read-only CSV mode."
             )
 
-        # Start standard publishing loop
+        # --- 3. Start standard publishing loop ---
         self.timer = self.create_timer(
             1.0 / self.publish_rate,
             self.publish,
@@ -246,7 +246,7 @@ class RacelineCsvPublisher(Node):
         return path_msg
 
     def publish(self):
-        # Do not publish if we have no points yet (e.g. HTTP mode waiting for post)
+        # Do not publish if we have no points yet
         if not self.raceline_msg.points:
             return
 
@@ -356,7 +356,7 @@ class RacelineCsvPublisher(Node):
                     new_raceline_msg = node.parse_csv_lines(lines)
                     new_path_msg = node.create_path_msg(new_raceline_msg)
 
-                    # Update node state thread-safely
+                    # Update node state thread-safely (reference assignment is atomic in Python)
                     node.raceline_msg = new_raceline_msg
                     node.path_msg = new_path_msg
 
