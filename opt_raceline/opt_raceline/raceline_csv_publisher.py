@@ -3,7 +3,9 @@
 import csv
 import math
 import os
+import threading
 from pathlib import Path
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import rclpy
 from rclpy.node import Node
@@ -15,7 +17,6 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from ament_index_python.packages import (
     get_package_share_directory,
-    PackageNotFoundError,
 )
 
 REQUIRED_COLUMNS = (
@@ -38,16 +39,24 @@ def yaw_to_quaternion(yaw: float):
 class RacelineCsvPublisher(Node):
     def __init__(self):
         super().__init__("raceline_csv_publisher")
+        self.get_logger().info("Initializing RacelineCsvPublisher node...")
 
-        self.declare_parameter("map_name")
+        self.declare_parameter("map_name", "NO MAP SPECIFIED")
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
 
-        self.csv_path = self.resolve_csv_path(self.get_parameter("map_name").value)
-        self.get_logger().info(f"Resolved raceline CSV path: {self.csv_path}")
+        # New parameters for deciding source and configuring the HTTP server
+        self.declare_parameter("source_mode", "csv")  # "csv" or "http"
+        self.declare_parameter("http_port", 8000)
 
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
+        self.source_mode = self.get_parameter("source_mode").value
+        self.http_port = self.get_parameter("http_port").value
+
+        self.get_logger().info(
+            f"Configuration: source_mode='{self.source_mode}', frame_id='{self.frame_id}', publish_rate={self.publish_rate}Hz"
+        )
 
         self.raceline_pub = self.create_publisher(
             Raceline,
@@ -65,31 +74,53 @@ class RacelineCsvPublisher(Node):
             MarkerArray, "/raceline/speed_markers", 10
         )
 
-        try:
-            self.raceline_msg = self.load_raceline_csv(self.csv_path)
-            self.path_msg = self.create_path_msg(self.raceline_msg)
-        except Exception as exc:
-            self.get_logger().error(
-                f"Failed to load raceline CSV '{self.csv_path}': {exc}"
-            )
-            self.raceline_msg = Raceline()
-            self.raceline_msg.header.frame_id = self.frame_id
-            self.path_msg = PathMsg()
-            self.path_msg.header.frame_id = self.frame_id
+        # Initialize with empty messages to prevent crashes before data arrives
+        self.raceline_msg = Raceline()
+        self.raceline_msg.header.frame_id = self.frame_id
+        self.path_msg = PathMsg()
+        self.path_msg.header.frame_id = self.frame_id
 
+        # --- Handle Source Mode ---
+        if self.source_mode == "csv":
+            map_name = self.get_parameter("map_name").value
+            try:
+                self.csv_path = self.resolve_csv_path(map_name)
+                self.get_logger().info(
+                    f"Attempting to load CSV raceline from: {self.csv_path}"
+                )
+                self.raceline_msg = self.load_raceline_csv(self.csv_path)
+                self.path_msg = self.create_path_msg(self.raceline_msg)
+
+                self.get_logger().info(
+                    f"Successfully loaded raceline! Total points: {len(self.raceline_msg.points)}"
+                )
+            except Exception as exc:
+                self.get_logger().error(
+                    f"Failed to load raceline CSV '{map_name}': {exc}"
+                )
+
+        elif self.source_mode == "http":
+            self.get_logger().info(
+                f"Mode set to 'http'. Booting up HTTP server on port {self.http_port}..."
+            )
+            self.start_http_server()
+        else:
+            self.get_logger().error(
+                f"Invalid source_mode '{self.source_mode}'. Must be 'csv' or 'http'."
+            )
+
+        # Start standard publishing loop
         self.timer = self.create_timer(
             1.0 / self.publish_rate,
             self.publish,
         )
 
-        if self.raceline_msg.points:
-            self.get_logger().info(f"Loaded raceline CSV: {self.csv_path}")
+        self.get_logger().info("Publishing pipelines established:")
+        self.get_logger().info(" -> /raceline/trajectory  (msgs/msg/Raceline)")
+        self.get_logger().info(" -> /raceline/path        (nav_msgs/msg/Path)")
         self.get_logger().info(
-            f"Number of raceline points: {len(self.raceline_msg.points)}"
+            " -> /raceline/speed_markers (visualization_msgs/msg/MarkerArray)"
         )
-        self.get_logger().info("Publishing:")
-        self.get_logger().info("  /raceline/trajectory  msgs/msg/Raceline")
-        self.get_logger().info("  /raceline/path        nav_msgs/msg/Path")
 
     def resolve_csv_path(self, map_name: str) -> str:
         path = os.path.join(
@@ -106,73 +137,74 @@ class RacelineCsvPublisher(Node):
         if not path.exists():
             raise FileNotFoundError(f"Raceline CSV does not exist: {csv_path}")
 
+        with path.open(newline="", encoding="utf-8") as csv_file:
+            lines = csv_file.readlines()
+            return self.parse_csv_lines(lines)
+
+    def parse_csv_lines(self, lines: list) -> Raceline:
+        """Core parsing logic decoupled from file I/O so it works with HTTP payloads"""
         header = None
         rows = []
-        with path.open(newline="") as csv_file:
-            for line_number, raw_line in enumerate(csv_file, start=1):
-                stripped = raw_line.strip()
-                if not stripped:
-                    continue
+        for line_number, raw_line in enumerate(lines, start=1):
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
 
-                if stripped.startswith("#"):
-                    maybe_header = next(
-                        csv.reader([stripped[1:].strip()], delimiter=";")
-                    )
-                    maybe_header = [field.strip() for field in maybe_header]
-                    if (
-                        "s_m" in maybe_header
-                        and "x_m" in maybe_header
-                        and "y_m" in maybe_header
-                    ):
-                        header = maybe_header
-                    continue
-
-                fields = next(csv.reader([stripped], delimiter=";"))
-                fields = [field.strip() for field in fields]
-
+            if stripped.startswith("#"):
+                maybe_header = next(csv.reader([stripped[1:].strip()], delimiter=";"))
+                maybe_header = [field.strip() for field in maybe_header]
                 if (
-                    header is None
-                    and "s_m" in fields
-                    and "x_m" in fields
-                    and "y_m" in fields
+                    "s_m" in maybe_header
+                    and "x_m" in maybe_header
+                    and "y_m" in maybe_header
                 ):
-                    header = fields
-                    continue
+                    header = maybe_header
+                continue
 
-                if header is None:
-                    if len(fields) < len(REQUIRED_COLUMNS):
-                        raise ValueError(
-                            f"Line {line_number}: expected at least "
-                            f"{len(REQUIRED_COLUMNS)} semicolon-separated columns."
-                        )
-                    header = list(REQUIRED_COLUMNS)
+            fields = next(csv.reader([stripped], delimiter=";"))
+            fields = [field.strip() for field in fields]
 
-                column_index = {name: index for index, name in enumerate(header)}
-                missing = [
-                    name for name in REQUIRED_COLUMNS if name not in column_index
-                ]
-                if missing:
+            if (
+                header is None
+                and "s_m" in fields
+                and "x_m" in fields
+                and "y_m" in fields
+            ):
+                header = fields
+                continue
+
+            if header is None:
+                if len(fields) < len(REQUIRED_COLUMNS):
                     raise ValueError(
-                        f"Raceline CSV is missing required columns: {', '.join(missing)}"
+                        f"Line {line_number}: expected at least "
+                        f"{len(REQUIRED_COLUMNS)} semicolon-separated columns."
                     )
+                header = list(REQUIRED_COLUMNS)
 
-                try:
-                    rows.append(
-                        {
-                            name: float(fields[column_index[name]])
-                            for name in REQUIRED_COLUMNS
-                        }
-                    )
-                except (IndexError, ValueError) as exc:
-                    raise ValueError(
-                        f"Line {line_number}: malformed raceline row."
-                    ) from exc
+            column_index = {name: index for index, name in enumerate(header)}
+            missing = [name for name in REQUIRED_COLUMNS if name not in column_index]
+            if missing:
+                raise ValueError(
+                    f"Raceline payload is missing required columns: {', '.join(missing)}"
+                )
+
+            try:
+                rows.append(
+                    {
+                        name: float(fields[column_index[name]])
+                        for name in REQUIRED_COLUMNS
+                    }
+                )
+            except (IndexError, ValueError) as exc:
+                raise ValueError(
+                    f"Line {line_number}: malformed raceline row."
+                ) from exc
 
         if not rows:
-            raise ValueError(f"Raceline CSV contains no data rows: {csv_path}")
+            raise ValueError("Raceline payload contains no data rows.")
         for previous, current in zip(rows, rows[1:]):
             if current["s_m"] <= previous["s_m"]:
-                raise ValueError("Raceline CSV s_m column must be strictly increasing.")
+                raise ValueError("Raceline s_m column must be strictly increasing.")
 
         msg = Raceline()
         msg.header.frame_id = self.frame_id
@@ -214,6 +246,10 @@ class RacelineCsvPublisher(Node):
         return path_msg
 
     def publish(self):
+        # Do not publish if we have no points yet (e.g. HTTP mode waiting for post)
+        if not self.raceline_msg.points:
+            return
+
         stamp = self.get_clock().now().to_msg()
 
         self.raceline_msg.header.stamp = stamp
@@ -265,6 +301,94 @@ class RacelineCsvPublisher(Node):
 
         return marker_array
 
+    # ---------------------------------------------------------
+    # HTTP SERVER INTEGRATION
+    # ---------------------------------------------------------
+    def start_http_server(self):
+        try:
+            handler = self.make_http_handler()
+            self.httpd = HTTPServer(("0.0.0.0", self.http_port), handler)
+            # Run server in a daemon thread so it doesn't block ROS spin and dies with the node
+            self.server_thread = threading.Thread(
+                target=self.httpd.serve_forever, daemon=True
+            )
+            self.server_thread.start()
+            self.get_logger().info(
+                f"HTTP server successfully started on 0.0.0.0:{self.http_port}"
+            )
+        except Exception as e:
+            self.get_logger().error(
+                f"Failed to start HTTP server on port {self.http_port}: {e}"
+            )
+
+    def make_http_handler(self):
+        node = self  # Capture reference to the ROS node
+
+        class HTTPRequestHandler(BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                # Redirect standard HTTP access logs to the ROS logger (as debug to avoid spam)
+                node.get_logger().debug(
+                    f"[HTTP] {self.client_address[0]} - {format % args}"
+                )
+
+            def do_OPTIONS(self):
+                # Essential for allowing the Svelte Web App to POST data (CORS preflight)
+                node.get_logger().debug(
+                    f"[HTTP] Received OPTIONS (CORS preflight) from {self.client_address[0]}"
+                )
+                self.send_response(200)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+
+            def do_POST(self):
+                client_ip = self.client_address[0]
+                node.get_logger().info(f"[HTTP] Received POST request from {client_ip}")
+
+                content_length = int(self.headers.get("Content-Length", 0))
+                node.get_logger().debug(f"[HTTP] Payload size: {content_length} bytes")
+
+                post_data = self.rfile.read(content_length).decode("utf-8")
+                lines = post_data.splitlines()
+
+                try:
+                    new_raceline_msg = node.parse_csv_lines(lines)
+                    new_path_msg = node.create_path_msg(new_raceline_msg)
+
+                    # Update node state thread-safely
+                    node.raceline_msg = new_raceline_msg
+                    node.path_msg = new_path_msg
+
+                    node.get_logger().info(
+                        f"[HTTP] Successfully updated live raceline! New point count: {len(new_raceline_msg.points)}"
+                    )
+
+                    self.send_response(200)
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(b"Raceline successfully updated.")
+
+                except Exception as e:
+                    node.get_logger().error(
+                        f"[HTTP] Failed to parse raceline from {client_ip}: {e}"
+                    )
+                    self.send_response(400)
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(f"Error parsing raceline: {e}".encode("utf-8"))
+
+        return HTTPRequestHandler
+
+    def destroy_node(self):
+        # Clean up HTTP server resources when node is shut down
+        self.get_logger().info("Shutting down node...")
+        if hasattr(self, "httpd"):
+            self.get_logger().info("Stopping HTTP server...")
+            self.httpd.shutdown()
+        super().destroy_node()
+        self.get_logger().info("Node successfully destroyed.")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -273,6 +397,8 @@ def main(args=None):
 
     try:
         rclpy.spin(node)
+    except KeyboardInterrupt:
+        node.get_logger().info("Keyboard interrupt received.")
     finally:
         node.destroy_node()
         rclpy.shutdown()
