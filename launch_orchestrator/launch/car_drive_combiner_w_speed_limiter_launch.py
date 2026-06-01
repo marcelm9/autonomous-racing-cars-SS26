@@ -14,6 +14,7 @@ from launch.actions import DeclareLaunchArgument
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
     raceline_index = LaunchConfiguration("raceline_index")
+    raceline_name = LaunchConfiguration("raceline_name")
 
     raceline_file = PythonExpression([
         "'", map_name, "' + ('_' + '", raceline_index, "' if '", raceline_index, "' else '')"
@@ -47,7 +48,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "map_name": raceline_file,
+                        "map_name": raceline_name,
                     }
                 ],
             ),
