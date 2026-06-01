@@ -36,6 +36,9 @@ FollowGap::FollowGap() : Node("reactive")
   this->declare_parameter<double>("sigma_front", this->SIGMA_FRONT);
   this->declare_parameter<double>("sigma_side", this->SIGMA_SIDE);
   this->declare_parameter<double>("sigma_amplitude", this->SIGMA_AMPLITUDE);
+  this->declare_parameter<double>("exp_distance", this->EXP_DISTANCE);
+  this->declare_parameter<double>("exp_angle", this->EXP_ANGLE);
+  this->declare_parameter<double>("speed_smoothing", this->SPEED_SMOOTHING);
 
   // Initialize from parameters
   this->get_parameter("max_speed", this->MAXDRIVESPEED);
@@ -57,6 +60,9 @@ FollowGap::FollowGap() : Node("reactive")
   this->get_parameter("sigma_front", this->SIGMA_FRONT);
   this->get_parameter("sigma_side", this->SIGMA_SIDE);
   this->get_parameter("sigma_amplitude", this->SIGMA_AMPLITUDE);
+  this->get_parameter("exp_distance", this->EXP_DISTANCE);
+  this->get_parameter("exp_angle", this->EXP_ANGLE);
+  this->get_parameter("speed_smoothing", this->SPEED_SMOOTHING);
 
   // Register the dynamic parameter callback
   callback_handle_ = this->add_on_set_parameters_callback(
@@ -138,6 +144,18 @@ rcl_interfaces::msg::SetParametersResult FollowGap::parameters_callback(const st
         else if (param.get_name() == "sigma_amplitude") {
             this->SIGMA_AMPLITUDE = param.as_double();
             RCLCPP_INFO(this->get_logger(), "Parameter 'sigma_amplitude' updated to: %.2f", this->SIGMA_AMPLITUDE);
+        }
+        else if (param.get_name() == "exp_distance") {
+            this->EXP_DISTANCE = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'exp_distance' updated to: %.2f", this->EXP_DISTANCE);
+        }
+        else if (param.get_name() == "exp_angle") {
+            this->EXP_ANGLE = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'exp_angle' updated to: %.2f", this->EXP_ANGLE);
+        }
+        else if (param.get_name() == "speed_smoothing") {
+            this->SPEED_SMOOTHING = param.as_double();
+            RCLCPP_INFO(this->get_logger(), "Parameter 'speed_smoothing' updated to: %.2f", this->SPEED_SMOOTHING);
         }
     }
     return result;
@@ -449,9 +467,13 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
 
   // Distance Factor: Normalize chosen gap depth (0.0 = close, 1.0 = max depth)
   double distance_factor = 0.0;
-  if (this->MAX_THRESHOLD > 0.0) {
+  if (this->MAXDISTANCE > 0.0) {
     distance_factor = std::min(chosen_gap_dist / this->MAXDISTANCE, 1.0);
   }
+
+  // Apply exponential scaling
+  angle_factor = std::pow(angle_factor, this->EXP_ANGLE);
+  distance_factor = std::pow(distance_factor, this->EXP_DISTANCE);
 
   // Combine both factors to determine optimal speed multiplier [0.0, 1.0]
   double speed_factor = distance_factor * angle_factor;
@@ -461,8 +483,11 @@ void FollowGap::scan_callback(const sensor_msgs::msg::LaserScan::ConstSharedPtr 
     speed_factor = 0.0;
   }
 
+  // Smoothening (Exponential Moving Average)
+  this->current_speed_factor = (this->SPEED_SMOOTHING * speed_factor) + ((1.0 - this->SPEED_SMOOTHING) * this->current_speed_factor);
+
   // Scale the multiplier into the settable Minimum and Maximum speeds
-  double set_speed = this->MINDRIVESPEED + (speed_factor * (this->MAXDRIVESPEED - this->MINDRIVESPEED));
+  double set_speed = this->MINDRIVESPEED + (this->current_speed_factor * (this->MAXDRIVESPEED - this->MINDRIVESPEED));
   this->diag_set_speed = set_speed; // Save for diagnostics
 
   //// PUBLISH ////
@@ -498,6 +523,7 @@ void FollowGap::diag_timer_callback()
 
   add_kv("1_goal_angle_final", this->goal_angle);
   add_kv("2_target_speed", this->diag_set_speed);
+  add_kv("2a_current_speed_factor", this->current_speed_factor);
   add_kv("3_active_threshold", this->diag_active_threshold);
   add_kv("4_num_gaps_found", static_cast<double>(this->all_gaps.size()));
   add_kv("5_dist_closest_front", this->diag_dist_closest_front);

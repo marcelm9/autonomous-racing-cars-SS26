@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <limits>
+#include <cmath>
 
 #include "rclcpp/rclcpp.hpp"
 /// CHECK: include needed ROS msg type headers and libraries
@@ -36,8 +37,8 @@ public:
 
 private:
     // PARAMETERS
-    double MAXDRIVESPEED = 6.0;
-    double MINDRIVESPEED = 3.0;
+    double MAXDRIVESPEED = 5.0;
+    double MINDRIVESPEED = 2.0;
     double MAXDISTANCE = 7.0; // Gap Distance at which max speed is reached
     double BRAKE_TUNE = 0.1; //0.075; // higher --> brake later
 
@@ -45,15 +46,20 @@ private:
     float MAX_THRESHOLD = 15; // Distance for the first gap search
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
-    size_t N_GAP_HITS = 65; // Need at least
+    size_t N_GAP_HITS = 80; // Need at least
     float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
 
     double SIGMA_FRONT = 2.4;
     double SIGMA_SIDE = 0.2;
     double SIGMA_AMPLITUDE = 0.4;
 
+    // parameters for speed calculation
+    double EXP_DISTANCE = 0.2;
+    double EXP_ANGLE = 0.5;
+    double SPEED_SMOOTHING = 0.5;
+
     // parameters for the Disparity Extender
-    int N_EXTEND = 100; // how many rays should be extended 
+    int N_EXTEND = 200; // how many rays should be extended 
     double STEP_DEPTH = 0.5; // how deep the gap must be to be extended
 
     // parameters for continuity correction
@@ -79,6 +85,7 @@ private:
     // variables
     double goal_angle = 0;
     double last_goal_angle = 0; // Previous steering target for continuity
+    double current_speed_factor = 0.0;
     std::vector<double> gap_angles;
     std::vector<std::vector<double>> all_gaps;
 
