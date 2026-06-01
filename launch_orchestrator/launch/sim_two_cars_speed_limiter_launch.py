@@ -12,6 +12,9 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     map_name = LaunchConfiguration("map_name")
+    raceline_name = LaunchConfiguration("raceline_name")
+    
+    
 
     return LaunchDescription(
         [
@@ -31,7 +34,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[
                     {
-                        "map_name": map_name,
+                        "map_name": raceline_name,
                     }
                 ],
             ),
