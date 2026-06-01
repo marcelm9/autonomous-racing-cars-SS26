@@ -67,7 +67,7 @@ def generate_launch_description():
                     {
                         "base_frame": "ego_racecar/base_link",
                         "drive_topic": "ego_racecar/drive",
-                        "odom_topic": "ego_racecar/odom",
+                        "odom_topic": "ego_racecar/ego_racecar/odom",
                         "min_lookahead": 0.3,
                         "max_lookahead": 3.0,
                         "lookahead_gain": 0.2,

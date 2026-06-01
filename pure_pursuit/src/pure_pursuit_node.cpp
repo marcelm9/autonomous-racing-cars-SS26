@@ -175,6 +175,8 @@ private:
       std::cout << "init error vector" << std::endl;
       std::vector<double> err_hist(raceline_.size(), 0.0); 
       raceline_error_history = err_hist;
+      raceline_speed_history = err_hist;
+      raceline_odom_speed_history = err_hist;
       raceline_error_initialized = true;
 
       this->distance_between_two_raceline_points = raceline_[1].s_m - raceline_[0].s_m;
@@ -287,6 +289,8 @@ private:
 
     while (i != nearest_index) {
       this->raceline_error_history[i] = err;
+      this->raceline_speed_history[i] = this->current_car_speed;
+      this->raceline_odom_speed_history[i] = this->current_speed_mps_;
 
       // adapt speed using the error profile
       if (do_adaptive_speed_control_) {
@@ -343,7 +347,6 @@ private:
     } else {
       target_speed = raceline_[nearest_index].vx_mps * mps_speed_gain;
     }
-
     // std::cout << "raceline_speed: " << raceline_[nearest_index].vx_mps << " publishing this speed: " << target_speed << std::endl;
     this->publishMarkers(goal_map, nearest_index, car_x, car_y);
     this->publishDrive(steering_angle, target_speed);
@@ -386,6 +389,7 @@ private:
     drive_msg.drive.steering_angle = static_cast<float>(steering_angle);
     drive_msg.drive.speed = static_cast<float>(target_speed);
     drive_pub_->publish(drive_msg);
+    this->current_car_speed = target_speed;
     // std::cout << "steering angle: " << steering_angle << std::endl;
     // std::cout << "target speed: " << target_speed << std::endl;
   }
@@ -394,7 +398,7 @@ private:
   {
     visualization_msgs::msg::MarkerArray marker_array;
     int marker_id = 0;
-    int skip_n = 30;
+    int skip_n = 5;
     for (std::size_t idx = 0; idx < raceline_.size(); ++idx)
     {
         // skip points: only process every nth point
@@ -424,7 +428,7 @@ private:
         marker.color.a = 1.0;
 
         std::ostringstream ss;
-        ss << std::fixed << std::setprecision(2) << "v:" <<point.vx_mps << " e:" << raceline_error_history[idx];
+        ss << std::fixed << std::setprecision(2) << "m:" <<point.vx_mps << "c:" << this->raceline_speed_history[idx] << "o:" <<this->raceline_odom_speed_history[idx];
         marker.text = ss.str();
 
         marker_array.markers.push_back(marker);
@@ -454,6 +458,8 @@ private:
   double current_speed_mps_ = 0.0;
   bool raceline_error_initialized = false;
   std::vector<double> raceline_error_history;
+  std::vector<double> raceline_speed_history;
+  std::vector<double> raceline_odom_speed_history;
   
   double min_mps_ = -1.0;
   double max_mps_ = -1.0;
@@ -472,6 +478,7 @@ private:
   double slow_down_factor = 1.0;
   bool do_linear_speed_scaling = true;
   double mps_speed_gain = 1.0;
+  double current_car_speed = 0.0;
 };
 
 int main(int argc, char **argv)
