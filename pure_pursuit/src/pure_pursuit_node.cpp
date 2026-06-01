@@ -343,7 +343,7 @@ private:
         max_steering_angle_);
 
 
-    std::cout << steering_angle << std::endl;
+    //std::cout << steering_angle << std::endl;
 
     double target_speed = min_speed_;
     if (do_linear_speed_scaling) {
