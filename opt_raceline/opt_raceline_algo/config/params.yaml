@@ -1,12 +1,12 @@
 # The following params are for maps
-map_name: 'track1_outer_edited_for_raceline'
+map_name: 'track2_outer_edited_for_raceline'
 map_img_ext: '.pgm'
 
 # The following params are for path generator
 num_lanes: 2
 clockwise: False
-inner_safe_dist: 0.2
-outer_safe_dist: 0.2
+inner_safe_dist: 0.25
+outer_safe_dist: 0.25
 opp_safe_dist: 0.2
 
 # The following params are for opponent predictor

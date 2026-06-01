@@ -125,3 +125,8 @@ To use the lap timer, create the file `<MAP_NAME>.checkpoints` in the directory 
 ## Drive Combiner
 
 If the cone / lane shown in rviz2 (`/drive_combiner/cone_marker`) does not move with the car, you have to publish a static transform: `ros2 run tf2_ros static_transform_publisher 0.27 0 0.11 0 0 0 particle_filter_base_frame laser2`.
+
+
+
+## Opt raceline repo
+https://github.com/zzjun725/f1tenth-racing-stack-ICRA22
