@@ -1,4 +1,4 @@
-image: track1_6.pgm
+image: track1_1.pgm
 mode: trinary
 resolution: 0.025
 origin: [-11.585, -10.055, 0]
