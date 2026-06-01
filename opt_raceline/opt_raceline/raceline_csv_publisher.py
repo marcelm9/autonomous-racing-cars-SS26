@@ -44,6 +44,7 @@ class RacelineCsvPublisher(Node):
         self.declare_parameter("map_name", "NO MAP SPECIFIED")
         self.declare_parameter("frame_id", "map")
         self.declare_parameter("publish_rate", 1.0)
+        self.declare_parameter("event_delay_s", 3.0)
 
         # HTTP Server configuration
         self.declare_parameter("allow_http_updates", True)
@@ -51,11 +52,16 @@ class RacelineCsvPublisher(Node):
 
         self.frame_id = self.get_parameter("frame_id").value
         self.publish_rate = float(self.get_parameter("publish_rate").value)
+        self.event_delay_s = float(self.get_parameter("event_delay_s").value)
         self.allow_http_updates = self.get_parameter("allow_http_updates").value
         self.http_port = self.get_parameter("http_port").value
 
+        # Flag to track when we need to fire a delayed event
+        self.pending_event = False
+
         self.get_logger().info(
-            f"Configuration: frame_id='{self.frame_id}', publish_rate={self.publish_rate}Hz, allow_http_updates={self.allow_http_updates}"
+            f"Configuration: frame_id='{self.frame_id}', publish_rate={self.publish_rate}Hz, "
+            f"allow_http_updates={self.allow_http_updates}, event_delay_s={self.event_delay_s}s"
         )
 
         self.raceline_pub = self.create_publisher(
@@ -74,7 +80,6 @@ class RacelineCsvPublisher(Node):
             MarkerArray, "/raceline/speed_markers", 10
         )
 
-        # Create publisher for the new_raceline event
         self.new_raceline_event_pub = self.create_publisher(
             Bool, "/new_raceline_published", 10
         )
@@ -94,6 +99,9 @@ class RacelineCsvPublisher(Node):
             )
             self.raceline_msg = self.load_raceline_csv(self.csv_path)
             self.path_msg = self.create_path_msg(self.raceline_msg)
+
+            # Trigger the delayed event for the initial load
+            self.pending_event = True
 
             self.get_logger().info(
                 f"Successfully loaded base raceline! Total points: {len(self.raceline_msg.points)}"
@@ -251,6 +259,13 @@ class RacelineCsvPublisher(Node):
 
         return path_msg
 
+    # Function to handle the actual delayed event publishing
+    def publish_delayed_event(self):
+        bool_msg = Bool()
+        bool_msg.data = True
+        self.new_raceline_event_pub.publish(bool_msg)
+        self.get_logger().info(f"Published delayed 'True' to /new_raceline_published")
+
     def publish(self):
         # Do not publish if we have no points yet
         if not self.raceline_msg.points:
@@ -266,9 +281,19 @@ class RacelineCsvPublisher(Node):
 
         speed_marker_array = self.create_speed_marker_array(self.raceline_msg, stamp)
 
+        # 1. Publish the main raceline data
         self.raceline_pub.publish(self.raceline_msg)
         self.path_pub.publish(self.path_msg)
         self.speed_marker_pub.publish(speed_marker_array)
+
+        # 2. If a new raceline was just published, kick off the background delay timer
+        if self.pending_event:
+            self.pending_event = False
+            self.get_logger().info(
+                f"New raceline data sent to topics. Triggering /new_raceline_published event in {self.event_delay_s}s..."
+            )
+            # Python's threading.Timer handles the non-blocking delay perfectly
+            threading.Timer(self.event_delay_s, self.publish_delayed_event).start()
 
     def create_speed_marker_array(self, raceline_msg: Raceline, stamp) -> MarkerArray:
         marker_array = MarkerArray()
@@ -366,10 +391,8 @@ class RacelineCsvPublisher(Node):
                     node.raceline_msg = new_raceline_msg
                     node.path_msg = new_path_msg
 
-                    # Publish a Bool to let the system know a new raceline arrived
-                    bool_msg = Bool()
-                    bool_msg.data = True
-                    node.new_raceline_event_pub.publish(bool_msg)
+                    # Flag that a new update occurred, picked up by the next publish() tick
+                    node.pending_event = True
 
                     node.get_logger().info(
                         f"[HTTP] Successfully updated live raceline! New point count: {len(new_raceline_msg.points)}"
