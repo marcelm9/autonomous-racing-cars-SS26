@@ -77,7 +77,7 @@ def generate_launch_description():
                         "adaptive_control_slowing_factor": 1.0,
                         "adaptive_control_speed_up_factor": 1.0,
                         "mps_speed_gain_for_nonlinear_speed_output": 1.0,
-                        "delay_correction": 10,
+                        "delay_correction": 2,
                     }
                 ],
             ),
