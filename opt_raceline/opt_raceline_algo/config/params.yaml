@@ -1,5 +1,5 @@
 # The following params are for maps
-map_name: 'track2_inner_edited_for_raceline'
+map_name: 'track1_inner_edited_for_raceline'
 map_img_ext: '.pgm'
 
 # The following params are for path generator

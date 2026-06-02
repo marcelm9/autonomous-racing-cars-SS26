@@ -120,7 +120,7 @@ def generate_launch_description():
                         "base_frame": "particle_filter_base_frame",
                         "laser_frame": "laser2",
                         "pp_input_topic": "ego_racecar/drive_combined",
-                        "drive_output_topic": "drive",
+                        "drive_output_topic": "ego_racecar/drive",
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
                         "ttc_threshold": 1.0,

@@ -617,7 +617,7 @@ import hashlib
 # define output paths
 output_dir = "./../../launch_orchestrator/maps"
 os.makedirs(output_dir, exist_ok=True)
-output_file = os.path.join(output_dir, "raceline2_inner_1.csv")
+output_file = os.path.join(output_dir, "raceline2_inner_for_marcel.csv")
 
 # create random UUID
 rand_uuid = str(uuid.uuid4())
