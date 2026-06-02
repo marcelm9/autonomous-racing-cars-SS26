@@ -228,13 +228,7 @@ private:
         {
           max_mps_ = point.vx_mps;
         }
-      }
-
-        
-      RCLCPP_INFO_ONCE(
-          this->get_logger(),
-          "Raceline speed limits (MPS, not real values! For real set 'min_speed' and 'max_speed'): Min = %.2f m/s, Max = %.2f m/s",
-          min_mps_, max_mps_);
+      }        
     }
   }
 
