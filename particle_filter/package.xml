@@ -12,7 +12,6 @@
 
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>rcl_interfaces</depend>
   <depend>nav_msgs</depend>
   <depend>nav2_lifecycle_manager</depend>
   <depend>nav2_msgs</depend>

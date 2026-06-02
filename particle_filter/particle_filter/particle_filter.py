@@ -38,7 +38,6 @@ from tf2_ros import TransformBroadcaster
 import tf_transformations
 
 # messages
-from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import String, Header, Float32MultiArray
 from sensor_msgs.msg import LaserScan
 from visualization_msgs.msg import Marker
@@ -192,51 +191,7 @@ class ParticleFiler(Node):
             self.clicked_pose,
             1)
 
-        # register parameter callback
-        self.add_on_set_parameters_callback(self.parameters_callback)
-
         self.get_logger().info('Finished initializing, waiting on messages...')
-
-    def parameters_callback(self, params):
-        sensor_model_changed = False
-        for param in params:
-            if param.name == 'squash_factor':
-                if param.value == 0:
-                    return SetParametersResult(successful=False, reason="squash_factor cannot be zero")
-                self.INV_SQUASH_FACTOR = 1.0 / param.value
-            elif param.name == 'viz':
-                self.DO_VIZ = param.value
-            elif param.name == 'max_viz_particles':
-                self.MAX_VIZ_PARTICLES = param.value
-            elif param.name == 'fine_timing':
-                self.SHOW_FINE_TIMING = param.value
-            elif param.name == 'z_short':
-                self.Z_SHORT = param.value
-                sensor_model_changed = True
-            elif param.name == 'z_max':
-                self.Z_MAX = param.value
-                sensor_model_changed = True
-            elif param.name == 'z_rand':
-                self.Z_RAND = param.value
-                sensor_model_changed = True
-            elif param.name == 'z_hit':
-                self.Z_HIT = param.value
-                sensor_model_changed = True
-            elif param.name == 'sigma_hit':
-                self.SIGMA_HIT = param.value
-                sensor_model_changed = True
-            elif param.name == 'motion_dispersion_x':
-                self.MOTION_DISPERSION_X = param.value
-            elif param.name == 'motion_dispersion_y':
-                self.MOTION_DISPERSION_Y = param.value
-            elif param.name == 'motion_dispersion_theta':
-                self.MOTION_DISPERSION_THETA = param.value
-        
-        if sensor_model_changed:
-            with self.state_lock:
-                self.precompute_sensor_model()
-                
-        return SetParametersResult(successful=True)
 
     def get_omap(self):
         '''
