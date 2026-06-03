@@ -334,23 +334,28 @@ namespace pure_pursuit
   }
 
   double computeMpsDependentSpeed(
-      double mps_min,
-      double mps_max,
+      double /* mps_min */, // Ignored since we use a fixed 0-100 scale
+      double /* mps_max */, // Ignored since we use a fixed 0-100 scale
       double current_speed_mps,
       double min_speed,
       double max_speed)
   {
-    mps_max = 100.0;
-    // safety check
-    if (mps_max <= mps_min)
+    // 1. At or below 0: Output min_speed
+    if (current_speed_mps <= 0.0)
     {
       return min_speed;
     }
 
-    double factor = (current_speed_mps - mps_min) / (mps_max - mps_min);
-    double unclamped = min_speed + (factor * (max_speed - min_speed));
+    // 2. Between 0 and 100: Interpolate smoothly from min_speed to max_speed
+    if (current_speed_mps <= 100.0)
+    {
+      double factor = current_speed_mps / 100.0;
+      return min_speed + (factor * (max_speed - min_speed));
+    }
 
-    return std::clamp(unclamped, min_speed, 20.0);
+    // 3. Above 100: Purely scale max_speed (e.g., 150 -> max_speed * 1.5)
+    double factor = current_speed_mps / 100.0;
+    return max_speed * factor;
   }
 
   double computePurePursuitSteering(
