@@ -47,7 +47,7 @@ private:
     float MIN_THRESHOLD = 0.3;
     int DYN_THRESHOLD_INCREMENT = 15; // How many increments of threshold should be tried
     size_t N_GAP_HITS = 80; // Need at least
-    float GAP_VIEW_ANGLE_PROCENT = 0.2; // How much should be considered from the ranges when looking for gaps
+    float GAP_VIEW_ANGLE_PROCENT = 0.35; // How much should be considered from the ranges when looking for gaps
 
     double SIGMA_FRONT = 2.4;
     double SIGMA_SIDE = 0.2;
