@@ -644,7 +644,13 @@ class ParticleFiler(Node):
             t_sensor = time.time()
 
         # normalize importance weights
-        self.weights /= np.sum(self.weights)
+        weight_sum = np.sum(self.weights)
+        if weight_sum == 0.0 or np.isnan(weight_sum):
+            self.get_logger().warn("Particle deprivation detected! Resetting weights.")
+            self.weights = np.ones(self.MAX_PARTICLES) / float(self.MAX_PARTICLES)
+        else:
+            self.weights /= weight_sum
+
         if self.SHOW_FINE_TIMING:
             t_norm = time.time()
             t_total = (t_norm - t)/100.0
