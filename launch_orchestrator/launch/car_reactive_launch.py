@@ -48,6 +48,7 @@ def generate_launch_description():
                         "exp_angle": 0.5,
                         "exp_distance": 0.4,
                         "reac_n_extend": 200,
+                        "gap_view_angle_procent": 0.35,
                     }
                 ],
             ),
