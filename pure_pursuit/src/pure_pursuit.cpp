@@ -340,6 +340,7 @@ namespace pure_pursuit
       double min_speed,
       double max_speed)
   {
+    mps_max = 100.0;
     // safety check
     if (mps_max <= mps_min)
     {
@@ -349,7 +350,7 @@ namespace pure_pursuit
     double factor = (current_speed_mps - mps_min) / (mps_max - mps_min);
     double unclamped = min_speed + (factor * (max_speed - min_speed));
 
-    return std::clamp(unclamped, min_speed, max_speed);
+    return std::clamp(unclamped, min_speed, 20.0);
   }
 
   double computePurePursuitSteering(
