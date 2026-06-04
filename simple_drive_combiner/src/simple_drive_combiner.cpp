@@ -171,6 +171,7 @@ private:
         {
             // Optional: If the strategist explicitly tells us to exit early, honor it
             reactive_mode_active_ = false;
+            publish_startup_pose();
             RCLCPP_INFO(this->get_logger(), "📋 Strategy Event -> Early exit to PURE PURSUIT via Strategist request.");
         }
     }
