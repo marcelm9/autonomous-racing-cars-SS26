@@ -63,12 +63,12 @@ def generate_launch_description():
                         "base_frame": "particle_filter_base_frame",
                         "drive_topic": "/drive_pp",
                         "odom_topic": "/odom",
-                        "min_lookahead": 0.5,
+                        "min_lookahead": 0.65,
                         "max_lookahead": 2.0,
                         "lookahead_gain": 1.0,
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
-                        "min_speed": 2.0,
+                        "min_speed": 1.5,
                         "max_speed": 5.4,
                         "do_linear_speed_scaling": True,
                         "curvature_speed_gain": -0.2,
@@ -76,6 +76,7 @@ def generate_launch_description():
                         "adaptive_control_slowing_factor": 1.0,
                         "adaptive_control_speed_up_factor": 1.0,
                         "mps_speed_gain_for_nonlinear_speed_output": 1.0,
+                        "delay_correction":5,
                     }
                 ],
             ),
@@ -89,11 +90,11 @@ def generate_launch_description():
                         "scan_topic": "/scan",
                         "odom_topic": "/odom",
                         "drive_topic": "/drive_re",
-                        "min_speed": 2.0,
+                        "min_speed": 5.0,
                         "max_speed": 6.0,
-                        "reac_n_extend": 50,
-                        "n_gap_hits": 50,
-                    
+                        "reac_n_extend": 10,
+                        "n_gap_hits": 60,
+                        "gap_view_angle_procent":0.35,
                     }
                 ],
             ),
@@ -114,6 +115,7 @@ def generate_launch_description():
                         "re_input_topic": "/drive_re",
                         "drive_output_topic": "/drive",
                         "odom_topic": "/odom",
+                        "reactive_distance_threshold_m":10.0
                     }
                 ],
             ),
