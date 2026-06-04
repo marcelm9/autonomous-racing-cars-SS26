@@ -31,7 +31,7 @@ def generate_launch_description():
                     {
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
-                        "drive_topic": "ego_racecar/drive",
+                        "drive_topic": "pego_racecar/drive",
                         "max_speed": 3.0,
                     }
                 ],
