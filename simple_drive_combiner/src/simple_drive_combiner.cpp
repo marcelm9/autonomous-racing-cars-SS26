@@ -16,8 +16,7 @@ public:
         : Node("strategy_drive_combiner"),
           reactive_mode_active_(false),
           distance_driven_in_reactive_(0.0),
-          has_last_pos_(false),
-          initial_pose_published_(false)
+          has_last_pos_(false)
     {
         // Declare parameters (Reconfigurable on-the-fly)
         this->declare_parameter<double>("reactive_distance_threshold_m", 5.0);
@@ -65,9 +64,7 @@ public:
         initial_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             this->get_parameter("initial_pose_topic").as_string(), 10);
 
-        // --- REMOVED THE 500MS STARTUP TIMER ---
-        
-        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Pose pending first return transition.");
+        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Pose resets enabled on every transition back.");
     }
 
 private:
@@ -76,7 +73,6 @@ private:
     double distance_driven_in_reactive_;
     bool has_last_pos_;
     double last_x_, last_y_;
-    bool initial_pose_published_;
 
     // Parameters
     double reactive_dist_thresh_;
@@ -113,15 +109,10 @@ private:
     }
 
     // -------------------------------------------------------------------------
-    // One-shot Initial Pose Broadcast (Triggered on Switchback Event)
+    // Initial Pose Broadcast (Executes every single time it's called)
     // -------------------------------------------------------------------------
     void publish_startup_pose()
     {
-        if (initial_pose_published_)
-        {
-            return;
-        }
-
         auto init_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
         init_pose_msg.header.stamp = this->get_clock()->now();
         init_pose_msg.header.frame_id = "map";
@@ -144,8 +135,6 @@ private:
 
         initial_pose_pub_->publish(init_pose_msg);
         RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose to /initialpose facing (13.8, -6.16)");
-        
-        initial_pose_published_ = true;
     }
 
     // -------------------------------------------------------------------------
@@ -161,10 +150,10 @@ private:
         }
         else if (msg->data == pp_token_ && reactive_mode_active_)
         {
-            reactive_mode_active = false;
+            reactive_mode_active_ = false;
             RCLCPP_INFO(this->get_logger(), "📋 Strategy Event -> Early exit to PURE PURSUIT via Strategist request.");
             
-            // --- TRIGGER ON OVERRIDE ---
+            // Trigger every time we return via explicit strategist message
             publish_startup_pose();
         }
     }
@@ -184,11 +173,11 @@ private:
 
             if (distance_driven_in_reactive_ >= reactive_dist_thresh_)
             {
-                reactive_mode_active = false;
+                reactive_mode_active_ = false;
                 RCLCPP_INFO(this->get_logger(), "⏱️ Odometer Limit Reached (%.2fm >= %.2fm)! Returning to PURE PURSUIT.", 
                             distance_driven_in_reactive_, reactive_dist_thresh_);
                 
-                // --- TRIGGER ON ODOMETER TIMEOUT ---
+                // Trigger every time we return via odometer expiration
                 publish_startup_pose();
             }
         }
