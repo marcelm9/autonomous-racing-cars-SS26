@@ -83,6 +83,8 @@ def generate_launch_description():
                         "adaptive_control_speed_up_factor": 1.0,
                         "mps_speed_gain_for_nonlinear_speed_output": 1.0,
                         "delay_correction": 1,
+                        # "localization_search_backward_m": 100.0,
+                        # "localization_search_forward_m": 100.0,
                     }
                 ],
             ),
