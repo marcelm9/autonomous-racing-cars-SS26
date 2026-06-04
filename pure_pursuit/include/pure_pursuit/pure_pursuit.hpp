@@ -27,6 +27,23 @@ namespace pure_pursuit
       double y_m,
       int delay_correction);
 
+  std::size_t findProgressAwareNearestPointIndex(
+      const std::vector<RacelinePoint> &raceline,
+      double x_m,
+      double y_m,
+      double yaw_rad,
+      std::size_t previous_index,
+      bool previous_index_valid,
+      double search_backward_m,
+      double search_forward_m,
+      double relocalization_distance_threshold_m,
+      double relocalization_heading_weight);
+
+  std::size_t applyRacelineIndexOffset(
+      std::size_t index,
+      int offset,
+      std::size_t raceline_size);
+
   std::size_t findLookaheadPointIndex(
       const std::vector<RacelinePoint> &raceline,
       std::size_t nearest_index,

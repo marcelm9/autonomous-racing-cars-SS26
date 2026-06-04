@@ -136,6 +136,20 @@ namespace pure_pursuit
       return nearest_index;
     }
 
+    double squaredDistance(const RacelinePoint &point, double x_m, double y_m)
+    {
+      const double dx = point.x_m - x_m;
+      const double dy = point.y_m - y_m;
+      return dx * dx + dy * dy;
+    }
+
+    double squaredAngleError(double first_rad, double second_rad)
+    {
+      constexpr double TWO_PI = 6.28318530717958647692;
+      const double error_rad = std::remainder(first_rad - second_rad, TWO_PI);
+      return error_rad * error_rad;
+    }
+
   } // namespace
 
   std::vector<RacelinePoint> parseRacelineCsv(const std::string &csv_path)
@@ -242,9 +256,136 @@ namespace pure_pursuit
         nearest_index = i;
       }
     }
-    nearest_index = (nearest_index + delay_correction) % raceline.size();
+    nearest_index = applyRacelineIndexOffset(nearest_index, delay_correction, raceline.size());
 
     return nearest_index;
+  }
+
+  std::size_t findProgressAwareNearestPointIndex(
+      const std::vector<RacelinePoint> &raceline,
+      double x_m,
+      double y_m,
+      double yaw_rad,
+      std::size_t previous_index,
+      bool previous_index_valid,
+      double search_backward_m,
+      double search_forward_m,
+      double relocalization_distance_threshold_m,
+      double relocalization_heading_weight)
+  {
+    if (raceline.empty())
+    {
+      throw std::invalid_argument("Cannot search nearest point on an empty raceline");
+    }
+
+    const auto find_global_heading_aware = [&]()
+    {
+      std::size_t best_index = 0;
+      double best_score = std::numeric_limits<double>::infinity();
+      for (std::size_t i = 0; i < raceline.size(); ++i)
+      {
+        const double score =
+            squaredDistance(raceline[i], x_m, y_m) +
+            std::max(0.0, relocalization_heading_weight) *
+                squaredAngleError(raceline[i].psi_rad, yaw_rad);
+        if (score < best_score)
+        {
+          best_score = score;
+          best_index = i;
+        }
+      }
+      return best_index;
+    };
+
+    std::size_t nearest_index = 0;
+    if (!previous_index_valid || previous_index >= raceline.size())
+    {
+      return find_global_heading_aware();
+    }
+
+    nearest_index = previous_index;
+    double best_distance_sq = squaredDistance(raceline[previous_index], x_m, y_m);
+
+    const auto consider = [&](std::size_t index)
+    {
+      const double distance_sq = squaredDistance(raceline[index], x_m, y_m);
+      if (distance_sq < best_distance_sq)
+      {
+        best_distance_sq = distance_sq;
+        nearest_index = index;
+      }
+    };
+
+    const double forward_limit_m = std::max(0.0, search_forward_m);
+    double accumulated_m = 0.0;
+    std::size_t current_index = previous_index;
+    while (accumulated_m < forward_limit_m)
+    {
+      const std::size_t next_index = (current_index + 1) % raceline.size();
+      accumulated_m += std::hypot(
+          raceline[next_index].x_m - raceline[current_index].x_m,
+          raceline[next_index].y_m - raceline[current_index].y_m);
+      if (accumulated_m > forward_limit_m)
+      {
+        break;
+      }
+      consider(next_index);
+      current_index = next_index;
+      if (current_index == previous_index)
+      {
+        break;
+      }
+    }
+
+    const double backward_limit_m = std::max(0.0, search_backward_m);
+    accumulated_m = 0.0;
+    current_index = previous_index;
+    while (accumulated_m < backward_limit_m)
+    {
+      const std::size_t previous_candidate =
+          (current_index + raceline.size() - 1) % raceline.size();
+      accumulated_m += std::hypot(
+          raceline[previous_candidate].x_m - raceline[current_index].x_m,
+          raceline[previous_candidate].y_m - raceline[current_index].y_m);
+      if (accumulated_m > backward_limit_m)
+      {
+        break;
+      }
+      consider(previous_candidate);
+      current_index = previous_candidate;
+      if (current_index == previous_index)
+      {
+        break;
+      }
+    }
+
+    const double threshold_m = std::max(0.0, relocalization_distance_threshold_m);
+    if (best_distance_sq > threshold_m * threshold_m)
+    {
+      nearest_index = find_global_heading_aware();
+    }
+
+    return nearest_index;
+  }
+
+  std::size_t applyRacelineIndexOffset(
+      std::size_t index,
+      int offset,
+      std::size_t raceline_size)
+  {
+    if (raceline_size == 0)
+    {
+      throw std::invalid_argument("Cannot offset an index on an empty raceline");
+    }
+    if (index >= raceline_size)
+    {
+      throw std::out_of_range("Raceline index is out of range");
+    }
+
+    const auto size = static_cast<long long>(raceline_size);
+    const auto corrected =
+        (static_cast<long long>(index) + static_cast<long long>(offset)) % size;
+    return static_cast<std::size_t>(corrected < 0 ? corrected + size : corrected);
   }
 
   double computeClosedTrackLength(const std::vector<RacelinePoint> &raceline)
