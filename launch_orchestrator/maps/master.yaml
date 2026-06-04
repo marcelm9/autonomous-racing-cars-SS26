@@ -1,4 +1,4 @@
-image: master1.pgm
+image: master.pgm
 mode: trinary
 resolution: 0.025
 origin: [-10.170, -23.171, 0]

@@ -10,13 +10,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)       # <--- ADD THIS
+find_package(geometry_msgs REQUIRED)  # <--- ADD THIS
 
 # --- ADD THESE LINES ---
 # Define the executable binary and its source file
 add_executable(simple_drive_combiner_node src/simple_drive_combiner.cpp)
 
 # Link the ROS 2 dependencies to the executable
-ament_target_dependencies(simple_drive_combiner_node rclcpp ackermann_msgs nav_msgs)
+ament_target_dependencies(simple_drive_combiner_node rclcpp ackermann_msgs nav_msgs std_msgs geometry_msgs)
 
 # Install the executable to the lib directory so 'ros2 run' can find it
 install(TARGETS
