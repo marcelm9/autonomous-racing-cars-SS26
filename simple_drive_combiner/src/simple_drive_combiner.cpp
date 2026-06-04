@@ -117,16 +117,16 @@ private:
         init_pose_msg.header.stamp = this->get_clock()->now();
         init_pose_msg.header.frame_id = "map";
 
-        // Exact starting point coordinates
-        init_pose_msg.pose.pose.position.x = 14.5;
-        init_pose_msg.pose.pose.position.y = -7.79;
+        // Exact starting point coordinates from telemetry updated here
+        init_pose_msg.pose.pose.position.x = 16.02715301513672;
+        init_pose_msg.pose.pose.position.y = -7.896660804748535;
         init_pose_msg.pose.pose.position.z = 0.0;
         
-        // Calculated direction vector quaternion pointing toward (13.8, -6.16)
+        // Exact direction vector quaternion updated here
         init_pose_msg.pose.pose.orientation.x = 0.0;
         init_pose_msg.pose.pose.orientation.y = 0.0;
-        init_pose_msg.pose.pose.orientation.z = 0.835;
-        init_pose_msg.pose.pose.orientation.w = 0.550;
+        init_pose_msg.pose.pose.orientation.z = 0.9871865154034859;
+        init_pose_msg.pose.pose.orientation.w = 0.15957062325353966;
 
         // Populate a standard default diagonal identity covariance matrix
         for(int i = 0; i < 36; i += 7) {
@@ -134,7 +134,7 @@ private:
         }
 
         initial_pose_pub_->publish(init_pose_msg);
-        RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose to /initialpose facing (13.8, -6.16)");
+        RCLCPP_INFO(this->get_logger(), "🎯 Sent Exact New Target Pose to /initialpose");
     }
 
     // -------------------------------------------------------------------------
