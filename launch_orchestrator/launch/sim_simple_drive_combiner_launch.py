@@ -102,9 +102,10 @@ def generate_launch_description():
                         
                         # Topic mappings
                         "strategy_topic": "/strategist/strategy",
-                        "pp_input_topic": "/drive_pp",
-                        "re_input_topic": "/drive_re",
-                        "drive_output_topic": "ego_racecar/ego_racecar/drive",
+                        "pp_input_topic": "ego_racecar/drive_pp",
+                        "re_input_topic": "ego_racecar/drive_re",
+                        "drive_output_topic": "ego_racecar/drive",
+                        "odom_topic": "ego_racecar/odom",
                     }
                 ],
             ),

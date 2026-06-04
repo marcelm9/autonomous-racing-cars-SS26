@@ -104,12 +104,10 @@ class Strategist(Node):
             (0.5, 0.5, 1.0),  # Light Blue
         ]
 
-        # Preserve order while getting unique strategies
         unique_strategies = list(
             dict.fromkeys(cp["strategy"] for cp in self.checkpoints)
         )
 
-        # Create a dictionary mapping strategies to colors using dictionary comprehension
         self.strategy_colors = {
             strat: palette[i % len(palette)]
             for i, strat in enumerate(unique_strategies)
@@ -122,14 +120,16 @@ class Strategist(Node):
         self.current_strategy = self.checkpoints[0]["strategy"]
 
         self.marker_timer = self.create_timer(1.0, self.publish_markers)
-        self.strategy_timer = self.create_timer(0.1, self.publish_strategy)
+        
+        # --- REMOVED THE CONTINUOUS 10HZ TIMER ---
+        # Strategy tokens are now published purely via events in position_callback
+
         self.position_timer = self.create_timer(
             1.0 / self.update_rate_hz, self.position_callback
         )
 
     def position_callback(self):
         try:
-            # Look up the latest transform between map and base_link
             t = self.tf_buffer.lookup_transform(
                 self.frame_id, self.base_frame, rclpy.time.Time()
             )
@@ -140,7 +140,6 @@ class Strategist(Node):
             )
             return
 
-        # Extract X and Y position from the transform
         curr_pos = (t.transform.translation.x, t.transform.translation.y)
 
         if self.prev_pos is not None:
@@ -151,6 +150,10 @@ class Strategist(Node):
             ):
                 self.current_strategy = target_cp["strategy"]
                 self.get_logger().info(f"🟥 STRATEGY UPDATED: {self.current_strategy}")
+                
+                # --- EVENT TRIGGER: Publish the new token immediately upon crossing ---
+                self.publish_strategy()
+                
                 self.advance_target()
 
         self.prev_pos = curr_pos
@@ -166,7 +169,7 @@ class Strategist(Node):
         return ccw(p1, p3, p4) != ccw(p2, p3, p4) and ccw(p1, p2, p3) != ccw(p1, p2, p4)
 
     def publish_strategy(self):
-        """Continually publishes the active strategy string."""
+        """Publishes the active strategy string (Called on event triggers)."""
         msg = String(data=self.current_strategy)
         self.strategy_pub.publish(msg)
 
@@ -180,12 +183,10 @@ class Strategist(Node):
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
 
-        # Position it directly above the base_link
         marker.pose.position.x = 0.3
         marker.pose.position.y = 0.0
         marker.pose.position.z = 0.15
 
-        # Proper quaternion initialization
         marker.pose.orientation.x = 0.0
         marker.pose.orientation.y = 0.0
         marker.pose.orientation.z = 0.0
@@ -195,7 +196,6 @@ class Strategist(Node):
         marker.scale.y = 0.2
         marker.scale.z = 0.2
 
-        # Assign the current strategy's color
         r, g, b = self.strategy_colors[self.current_strategy]
         marker.color.r = r
         marker.color.g = g
@@ -211,7 +211,6 @@ class Strategist(Node):
         for i, cp in enumerate(self.checkpoints):
             r, g, b = self.strategy_colors[cp["strategy"]]
 
-            # --- 1. Create the Line Marker ---
             line_marker = Marker()
             line_marker.header.frame_id = self.frame_id
             line_marker.header.stamp = self.get_clock().now().to_msg()
@@ -226,14 +225,12 @@ class Strategist(Node):
             line_marker.color.b = b
             line_marker.color.a = 0.6
 
-            # Define line endpoints
             line_marker.points = [
                 Point(x=cp["p1"][0], y=cp["p1"][1], z=0.0),
                 Point(x=cp["p2"][0], y=cp["p2"][1], z=0.0),
             ]
             marker_array.markers.append(line_marker)
 
-            # --- 2. Create the Text Marker ---
             text_marker = Marker()
             text_marker.header.frame_id = self.frame_id
             text_marker.header.stamp = self.get_clock().now().to_msg()
@@ -242,7 +239,6 @@ class Strategist(Node):
             text_marker.type = Marker.TEXT_VIEW_FACING
             text_marker.action = Marker.ADD
 
-            # Calculate midpoint for text placement
             text_marker.pose.position.x = (cp["p1"][0] + cp["p2"][0]) / 2.0
             text_marker.pose.position.y = (cp["p1"][1] + cp["p2"][1]) / 2.0
             text_marker.pose.position.z = 0.1

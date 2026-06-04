@@ -182,7 +182,6 @@ private:
     {
         double current_x = msg->pose.pose.position.x;
         double current_y = msg->pose.pose.position.y;
-
         if (has_last_pos_ && reactive_mode_active_)
         {
             // Calculate delta distance moved during this timestep

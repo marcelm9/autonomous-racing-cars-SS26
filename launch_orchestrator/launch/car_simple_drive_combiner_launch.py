@@ -111,6 +111,7 @@ def generate_launch_description():
                         "pp_input_topic": "/drive_pp",
                         "re_input_topic": "/drive_re",
                         "drive_output_topic": "/drive",
+                        "odom_topic": "/odom",
                     }
                 ],
             ),
