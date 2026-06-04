@@ -129,15 +129,18 @@ private:
 
         auto init_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
         init_pose_msg.header.stamp = this->get_clock()->now();
-        init_pose_msg.header.frame_id = "map"; // Standard localization frame
+        init_pose_msg.header.frame_id = "map";
 
-        // Change these coordinates to wherever your map's origin starter line sits
-        init_pose_msg.pose.pose.position.x = 0.0;
-        init_pose_msg.pose.pose.position.y = 0.0;
+        // Exact starting point coordinates
+        init_pose_msg.pose.pose.position.x = 14.5;
+        init_pose_msg.pose.pose.position.y = -7.79;
         init_pose_msg.pose.pose.position.z = 0.0;
         
-        // Face forward along the X axis (Quaternion identity)
-        init_pose_msg.pose.pose.orientation.w = 1.0;
+        // Calculated direction vector quaternion pointing toward (13.8, -6.16)
+        init_pose_msg.pose.pose.orientation.x = 0.0;
+        init_pose_msg.pose.pose.orientation.y = 0.0;
+        init_pose_msg.pose.pose.orientation.z = 0.835;
+        init_pose_msg.pose.pose.orientation.w = 0.550;
 
         // Populate a standard default diagonal identity covariance matrix
         for(int i = 0; i < 36; i += 7) {
@@ -145,7 +148,7 @@ private:
         }
 
         initial_pose_pub_->publish(init_pose_msg);
-        RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose Estimate to /initialpose");
+        RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose to /initialpose facing (13.8, -6.16)");
         
         initial_pose_published_ = true;
         init_pose_timer_->cancel();

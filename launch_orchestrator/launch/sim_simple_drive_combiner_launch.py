@@ -104,7 +104,7 @@ def generate_launch_description():
                         "strategy_topic": "/strategist/strategy",
                         "pp_input_topic": "/drive_pp",
                         "re_input_topic": "/drive_re",
-                        "drive_output_topic": "/drive",
+                        "drive_output_topic": "ego_racecar/ego_racecar/drive",
                     }
                 ],
             ),
