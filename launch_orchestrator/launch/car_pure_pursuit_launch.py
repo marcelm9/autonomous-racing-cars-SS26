@@ -70,7 +70,7 @@ def generate_launch_description():
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
                         "min_speed": 1.5,
-                        "max_speed": 4.0,
+                        "max_speed": 5.4,
                         "do_linear_speed_scaling": True,
                         "curvature_speed_gain": -0.2,
                         "do_error_based_adaptive_speed_control": False,
