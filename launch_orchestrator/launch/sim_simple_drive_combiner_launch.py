@@ -61,7 +61,7 @@ def generate_launch_description():
                     {
                         "base_frame": "ego_racecar/base_link",
                         "drive_topic": "ego_racecar/drive_pp",
-                        "odom_topic": "ego_racecar/odom",
+                        "odom_topic": "ego_racecar/ego_racecar/odom",
                         "min_lookahead": 0.65,
                         "max_lookahead": 2.0,
                         "lookahead_gain": 0.75,
@@ -102,9 +102,9 @@ def generate_launch_description():
                         
                         # Topic mappings
                         "strategy_topic": "/strategist/strategy",
-                        "pp_input_topic": "/drive_pp",
-                        "re_input_topic": "/drive_re",
-                        "drive_output_topic": "ego_racecar/ego_racecar/drive",
+                        "pp_input_topic": "ego_racecar/drive_pp",
+                        "re_input_topic": "ego_racecar/drive_re",
+                        "drive_output_topic": "ego_racecar/drive",
                     }
                 ],
             ),
