@@ -68,8 +68,8 @@ def generate_launch_description():
                         "wheelbase": 0.33,
                         "max_steering_angle": 0.42,
                         "target_speed_scaling": 0.8,
-                        "min_target_speed": 1.0,
-                        "max_target_speed": 4.5,
+                        "min_target_speed": 1.5,
+                        "max_target_speed": 5.4,
                         "curvature_speed_gain": 0.2,
                     }
                 ],
@@ -84,8 +84,10 @@ def generate_launch_description():
                         "scan_topic": "ego_racecar/scan",
                         "odom_topic": "ego_racecar/odom",
                         "drive_topic": "ego_racecar/drive_re",
-                        "min_speed": 1.0,
-                        "max_speed": 4.5,
+                        "min_speed": 2.0,
+                        "max_speed": 6.0,
+                        "reac_n_extend": 50,
+                        "n_gap_hits": 50,
                     }
                 ],
             ),
