@@ -46,6 +46,11 @@ public:
     this->declare_parameter<bool>("do_linear_speed_scaling", true);
     this->declare_parameter<double>("mps_speed_gain_for_nonlinear_speed_output", 1.0);
     this->declare_parameter<int>("delay_correction", 1);
+    this->declare_parameter<bool>("use_progress_aware_localization", true);
+    this->declare_parameter<double>("localization_search_backward_m", 0.5);
+    this->declare_parameter<double>("localization_search_forward_m", 2.0);
+    this->declare_parameter<double>("relocalization_distance_threshold_m", 1.5);
+    this->declare_parameter<double>("relocalization_heading_weight", 0.5);
 
 
     map_frame_ = this->get_parameter("map_frame").as_string();
@@ -64,6 +69,12 @@ public:
     do_linear_speed_scaling = this->get_parameter("do_linear_speed_scaling").as_bool();
     mps_speed_gain = this->get_parameter("mps_speed_gain_for_nonlinear_speed_output").as_double();
     delay_correction = this->get_parameter("delay_correction").as_int();
+    use_progress_aware_localization_ = this->get_parameter("use_progress_aware_localization").as_bool();
+    localization_search_backward_m_ = this->get_parameter("localization_search_backward_m").as_double();
+    localization_search_forward_m_ = this->get_parameter("localization_search_forward_m").as_double();
+    relocalization_distance_threshold_m_ =
+        this->get_parameter("relocalization_distance_threshold_m").as_double();
+    relocalization_heading_weight_ = this->get_parameter("relocalization_heading_weight").as_double();
 
     // Setup the parameter update callback for dynamic rqt/CLI tuning
     param_callback_handle_ = this->add_on_set_parameters_callback(
@@ -120,6 +131,27 @@ public:
             else if (param.get_name() == "delay_correction" && param.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER)
             {
               delay_correction = param.as_int();
+            }
+            else if (param.get_name() == "use_progress_aware_localization" && param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+            {
+              use_progress_aware_localization_ = param.as_bool();
+              progress_aware_localization_initialized_ = false;
+            }
+            else if (param.get_name() == "localization_search_backward_m" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              localization_search_backward_m_ = param.as_double();
+            }
+            else if (param.get_name() == "localization_search_forward_m" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              localization_search_forward_m_ = param.as_double();
+            }
+            else if (param.get_name() == "relocalization_distance_threshold_m" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              relocalization_distance_threshold_m_ = param.as_double();
+            }
+            else if (param.get_name() == "relocalization_heading_weight" && param.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE)
+            {
+              relocalization_heading_weight_ = param.as_double();
             }
           }
           return result;
@@ -195,6 +227,7 @@ private:
       raceline_speed_history = err_hist;
       raceline_odom_speed_history = err_hist;
       raceline_error_initialized = true;
+      progress_aware_localization_initialized_ = false;
 
 
       RCLCPP_INFO(
@@ -261,8 +294,34 @@ private:
     const double car_x = map_to_base.transform.translation.x;
     const double car_y = map_to_base.transform.translation.y;
 
-    const std::size_t nearest_index =
-        pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y, this->delay_correction);
+    std::size_t nearest_index;
+    if (use_progress_aware_localization_)
+    {
+      const auto &orientation = map_to_base.transform.rotation;
+      const double car_yaw_rad = std::atan2(
+          2.0 * (orientation.w * orientation.z + orientation.x * orientation.y),
+          1.0 - 2.0 * (orientation.y * orientation.y + orientation.z * orientation.z));
+      const std::size_t localized_index = pure_pursuit::findProgressAwareNearestPointIndex(
+          raceline_,
+          car_x,
+          car_y,
+          car_yaw_rad,
+          last_localization_index_,
+          progress_aware_localization_initialized_,
+          localization_search_backward_m_,
+          localization_search_forward_m_,
+          relocalization_distance_threshold_m_,
+          relocalization_heading_weight_);
+      last_localization_index_ = localized_index;
+      nearest_index =
+          pure_pursuit::applyRacelineIndexOffset(localized_index, delay_correction, raceline_.size());
+      progress_aware_localization_initialized_ = true;
+    }
+    else
+    {
+      nearest_index =
+          pure_pursuit::findNearestPointIndex(raceline_, car_x, car_y, this->delay_correction);
+    }
 
     const double lookahead_m = pure_pursuit::computeMpsDependentLookahead(
         min_mps_,
@@ -502,6 +561,13 @@ private:
   double mps_speed_gain = 1.0;
   double current_car_speed = 0.0;
   int delay_correction = 0;
+  bool use_progress_aware_localization_ = false;
+  bool progress_aware_localization_initialized_ = false;
+  std::size_t last_localization_index_ = 0;
+  double localization_search_backward_m_ = 0.5;
+  double localization_search_forward_m_ = 2.0;
+  double relocalization_distance_threshold_m_ = 1.5;
+  double relocalization_heading_weight_ = 0.5;
 };
 
 int main(int argc, char **argv)
