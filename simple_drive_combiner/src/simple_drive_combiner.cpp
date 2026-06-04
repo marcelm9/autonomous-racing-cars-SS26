@@ -65,12 +65,9 @@ public:
         initial_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             this->get_parameter("initial_pose_topic").as_string(), 10);
 
-        // Publish the initial pose setup sequence right away at startup
-        // Using a short one-shot timer ensures the publisher is fully initialized within the ROS mesh network
-        init_pose_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(500), std::bind(&StrategyDriveCombiner::publish_startup_pose, this));
-
-        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Limit: %.2fm", reactive_dist_thresh_);
+        // --- REMOVED THE 500MS STARTUP TIMER ---
+        
+        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Pose pending first return transition.");
     }
 
 private:
@@ -94,7 +91,6 @@ private:
     rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_re_sub_;
     rclcpp::Publisher<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr drive_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initial_pose_pub_;
-    rclcpp::TimerBase::SharedPtr init_pose_timer_;
 
     // -------------------------------------------------------------------------
     // Dynamic Parameter Reconfiguration Callback
@@ -117,13 +113,12 @@ private:
     }
 
     // -------------------------------------------------------------------------
-    // One-shot Startup Initial Pose Broadcast
+    // One-shot Initial Pose Broadcast (Triggered on Switchback Event)
     // -------------------------------------------------------------------------
     void publish_startup_pose()
     {
         if (initial_pose_published_)
         {
-            init_pose_timer_->cancel();
             return;
         }
 
@@ -151,7 +146,6 @@ private:
         RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose to /initialpose facing (13.8, -6.16)");
         
         initial_pose_published_ = true;
-        init_pose_timer_->cancel();
     }
 
     // -------------------------------------------------------------------------
@@ -159,20 +153,19 @@ private:
     // -------------------------------------------------------------------------
     void strategy_callback(const std_msgs::msg::String::SharedPtr msg)
     {
-        // Only allow switching INTO reactive mode via the strategist topic.
-        // Returning to pure pursuit is handled autonomously via tracking odometry distance.
         if (msg->data == re_token_ && !reactive_mode_active_)
         {
             reactive_mode_active_ = true;
-            distance_driven_in_reactive_ = 0.0; // Reset trip odometer
+            distance_driven_in_reactive_ = 0.0; 
             RCLCPP_INFO(this->get_logger(), "⚡ Strategy Event -> TRIGGERED REACTIVE MODE. Timeout in: %.2f meters.", reactive_dist_thresh_);
         }
         else if (msg->data == pp_token_ && reactive_mode_active_)
         {
-            // Optional: If the strategist explicitly tells us to exit early, honor it
-            reactive_mode_active_ = false;
-            publish_startup_pose();
+            reactive_mode_active = false;
             RCLCPP_INFO(this->get_logger(), "📋 Strategy Event -> Early exit to PURE PURSUIT via Strategist request.");
+            
+            // --- TRIGGER ON OVERRIDE ---
+            publish_startup_pose();
         }
     }
 
@@ -183,18 +176,20 @@ private:
     {
         double current_x = msg->pose.pose.position.x;
         double current_y = msg->pose.pose.position.y;
+
         if (has_last_pos_ && reactive_mode_active_)
         {
-            // Calculate delta distance moved during this timestep
             double delta_dist = std::hypot(current_x - last_x_, current_y - last_y_);
             distance_driven_in_reactive_ += delta_dist;
 
-            // Check if the parameter target has been surpassed
             if (distance_driven_in_reactive_ >= reactive_dist_thresh_)
             {
-                reactive_mode_active_ = false;
+                reactive_mode_active = false;
                 RCLCPP_INFO(this->get_logger(), "⏱️ Odometer Limit Reached (%.2fm >= %.2fm)! Returning to PURE PURSUIT.", 
                             distance_driven_in_reactive_, reactive_dist_thresh_);
+                
+                // --- TRIGGER ON ODOMETER TIMEOUT ---
+                publish_startup_pose();
             }
         }
 
