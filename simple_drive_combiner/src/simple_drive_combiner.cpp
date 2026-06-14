@@ -64,7 +64,12 @@ public:
         initial_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             this->get_parameter("initial_pose_topic").as_string(), 10);
 
-        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Pose resets enabled on every transition back.");
+        // Publish the initial pose setup sequence right away at startup
+        // Using a short one-shot timer ensures the publisher is fully initialized within the ROS mesh network
+        init_pose_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(500), std::bind(&StrategyDriveCombiner::startup_timer_callback, this));
+
+        RCLCPP_INFO(this->get_logger(), "Initialized. Mode: PURE PURSUIT. Limit: %.2fm", reactive_dist_thresh_);
     }
 
 private:
@@ -109,22 +114,24 @@ private:
     }
 
     // -------------------------------------------------------------------------
-    // Initial Pose Broadcast (Executes every single time it's called)
+    // Pose Publishing Logic (Decoupled from Timer)
     // -------------------------------------------------------------------------
-    void publish_startup_pose()
+    void publish_pose()
     {
         auto init_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
         init_pose_msg.header.stamp = this->get_clock()->now();
         init_pose_msg.header.frame_id = "map";
 
-        // Exact starting point coordinates from telemetry updated here
+        // Updated exact starting point coordinates
         init_pose_msg.pose.pose.position.x = 16.02715301513672;
         init_pose_msg.pose.pose.position.y = -7.896660804748535;
         init_pose_msg.pose.pose.position.z = 0.0;
         
-        // Exact direction vector quaternion updated here
+        // Updated direction vector quaternion
         init_pose_msg.pose.pose.orientation.x = 0.0;
         init_pose_msg.pose.pose.orientation.y = 0.0;
+        init_pose_msg.pose.pose.orientation.z = 0.9871865154034859;
+        init_pose_msg.pose.pose.orientation.w = 0.15957062325353966;
         init_pose_msg.pose.pose.orientation.z = 0.9871865154034859;
         init_pose_msg.pose.pose.orientation.w = 0.15957062325353966;
 
@@ -134,7 +141,20 @@ private:
         }
 
         initial_pose_pub_->publish(init_pose_msg);
-        RCLCPP_INFO(this->get_logger(), "🎯 Sent Exact New Target Pose to /initialpose");
+        RCLCPP_INFO(this->get_logger(), "🎯 Sent Fixed Initial Pose to /initialpose at (16.02, -7.89)");
+    }
+
+    // -------------------------------------------------------------------------
+    // One-shot Startup Timer Callback
+    // -------------------------------------------------------------------------
+    void startup_timer_callback()
+    {
+        if (!initial_pose_published_)
+        {
+            publish_pose();
+            initial_pose_published_ = true;
+            init_pose_timer_->cancel();
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -151,6 +171,7 @@ private:
         else if (msg->data == pp_token_ && reactive_mode_active_)
         {
             reactive_mode_active_ = false;
+            publish_pose(); // Now safely broadcasts
             RCLCPP_INFO(this->get_logger(), "📋 Strategy Event -> Early exit to PURE PURSUIT via Strategist request.");
             
             // Trigger every time we return via explicit strategist message
@@ -174,6 +195,7 @@ private:
             if (distance_driven_in_reactive_ >= reactive_dist_thresh_)
             {
                 reactive_mode_active_ = false;
+                publish_pose(); // Now safely broadcasts
                 RCLCPP_INFO(this->get_logger(), "⏱️ Odometer Limit Reached (%.2fm >= %.2fm)! Returning to PURE PURSUIT.", 
                             distance_driven_in_reactive_, reactive_dist_thresh_);
                 
